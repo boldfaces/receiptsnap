@@ -12,7 +12,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/msal-browser/2.38.3/msal-browser.min.js"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<script>
+  if (typeof msal === 'undefined') {
+    document.write('<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"><\/script>');
+  }
+</script>
 <style>
   :root{
     --bg:#fafafa; --page:#f4f4f5; --card:#ffffff;
@@ -519,6 +524,11 @@
   }
 
   async function initAuth(){
+    if(typeof msal === 'undefined'){
+      toast('The Microsoft sign-in library did not load. Check your connection and reload.');
+      renderAccount(); renderBanner();
+      return;
+    }
     msalApp = buildMsal();
     if(!msalApp) return;
     try{
@@ -591,11 +601,18 @@
     S.set('clientId', $('#s-clientid').value.trim());
     S.set('tenantId', $('#s-tenantid').value.trim());
     if(!S.get('clientId','') || !S.get('tenantId','')){ toast('Enter both the client ID and tenant ID first'); return; }
-    msalApp = buildMsal();
+    if(typeof msal === 'undefined'){ toast('The Microsoft sign-in library did not load. Check your connection and reload the page.'); return; }
     try{
+      msalApp = buildMsal();
+      await msalApp.handleRedirectPromise().catch(()=>{});
       await msalApp.loginRedirect({scopes:SCOPES});
     }catch(e){
-      toast('Sign-in failed: '+(e.errorCode||e.message));
+      if(String(e.errorCode||e.message||'').includes('interaction_in_progress')){
+        Object.keys(sessionStorage).filter(k=>k.indexOf('msal.')===0).forEach(k=>sessionStorage.removeItem(k));
+        toast('A previous sign-in attempt was stuck. Cleared it — tap the button again.');
+      }else{
+        toast('Sign-in failed: '+(e.errorCode||e.message||'unknown error'));
+      }
     }
   });
 
