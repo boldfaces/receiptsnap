@@ -58,6 +58,16 @@
   .banner button{color:var(--warn);font-weight:700;text-decoration:underline;font-size:13px;padding:0}
   .banner.err{background:var(--danger-bg);border-color:var(--danger-bd);color:var(--danger)}
   .banner.err button{color:var(--danger)}
+  .banner.info{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+  .banner.info button{color:#1d4ed8;font-weight:700;text-decoration:underline;font-size:13px;padding:0}
+
+  .conn{position:absolute;top:calc(20px + env(safe-area-inset-top));right:20px;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--border);color:var(--muted);background:var(--card)}
+  .conn .dot{width:6px;height:6px;border-radius:999px;background:var(--success)}
+  .conn.off{color:var(--warn);border-color:var(--warn-bd);background:var(--warn-bg)}
+  .conn.off .dot{background:var(--warn)}
+  .conn.syncing{color:#2563eb;border-color:#bfdbfe;background:#eff6ff}
+  .conn.syncing .dot{background:#2563eb;animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.35}}
 
   .viewfinder{border:1.5px dashed var(--border-strong);border-radius:var(--r-lg);background:linear-gradient(180deg,#fff 0%,#fafafa 100%);padding:30px 20px 24px;text-align:center}
   .viewfinder .cam{width:52px;height:52px;border-radius:16px;background:var(--card);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;box-shadow:var(--shadow);margin-bottom:14px;color:var(--muted)}
@@ -93,6 +103,7 @@
   .pill-warn{color:var(--warn);border-color:var(--warn-bd);background:var(--warn-bg)}
   .pill-ready{color:var(--success);border-color:var(--success-bd);background:var(--success-bg)}
   .pill-fail{color:var(--danger);border-color:var(--danger-bd);background:var(--danger-bg)}
+  .pill-sync{color:#2563eb;border-color:#bfdbfe;background:#eff6ff}
   .pill .dot{width:5px;height:5px;border-radius:999px;background:currentColor}
   .spin{width:11px;height:11px;border-radius:999px;border:1.5px solid var(--border-strong);border-top-color:var(--muted);animation:spin .7s linear infinite;display:inline-block}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -258,6 +269,29 @@
     .submitbar{left:360px}
   }
 
+  /* ---------- live camera ---------- */
+  .camview{position:fixed;inset:0;z-index:80;background:#000;display:none}
+  .camview.show{display:block}
+  #cam-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  #cam-overlay{position:absolute;inset:0;width:100%;height:100%}
+  .cam-top{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:calc(14px + env(safe-area-inset-top)) 16px 0}
+  .cam-icon{width:42px;height:42px;border-radius:12px;background:rgba(24,24,27,.55);color:#fff;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+  .cam-icon.on{background:#fff;color:#18181b}
+  .cam-bottom{position:absolute;left:0;right:0;bottom:0;padding:26px 16px calc(22px + env(safe-area-inset-bottom));text-align:center;background:linear-gradient(180deg,transparent,rgba(0,0,0,.6))}
+  .cam-status{color:#fff;font-size:13px;font-weight:500;text-shadow:0 1px 4px rgba(0,0,0,.6);margin-bottom:14px}
+  .cam-progress{width:190px;height:4px;border-radius:999px;background:rgba(255,255,255,.25);margin:-6px auto 14px;overflow:hidden;display:none}
+  .cam-progress.show{display:block}
+  #cam-progress-fill{display:block;height:100%;width:0%;background:#fff;border-radius:999px;transition:width .2s}
+  .cam-actions{display:flex;align-items:center;justify-content:center;gap:26px}
+  .cam-shutter{width:68px;height:68px;border-radius:999px;background:#fff;border:5px solid rgba(255,255,255,.35);background-clip:padding-box;transition:transform .1s}
+  .cam-shutter:active{transform:scale(.94)}
+  .cam-side{color:#fff;font-size:12px;font-weight:600;background:rgba(24,24,27,.55);border-radius:10px;padding:10px 12px;line-height:1.25;min-width:76px;backdrop-filter:blur(6px)}
+  .cam-side.on{background:#fff;color:#18181b}
+  .cam-count{color:rgba(255,255,255,.85);font-size:12px;margin-top:12px;font-weight:500;min-height:15px}
+  .full-photos{display:none;margin-bottom:16px}
+  .full-photos.show{display:block}
+  .full-photos img{width:100%;border-radius:var(--r-md);border:1px solid var(--border);display:block;margin-bottom:8px}
+
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
   }
@@ -271,6 +305,7 @@
     <div class="kicker" id="tb-kicker">Aparobot claims</div>
     <h1 id="tb-title">New batch</h1>
     <div class="sub" id="tb-sub">Scan receipts, confirm details, file them in one go.</div>
+    <div class="conn" id="conn"><span class="dot"></span>Online</div>
   </header>
 
   <main id="main">
@@ -278,6 +313,11 @@
 
     <!-- ============ SCAN ============ -->
     <section class="view active" id="view-scan">
+      <div class="banner info" id="sync-banner" style="display:none">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+        <span id="sync-banner-text"></span>
+        <button id="btn-sync-retry" style="display:none">Retry</button>
+      </div>
       <div class="banner" id="setup-banner" style="display:none">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
         <span id="setup-banner-text"></span>
@@ -288,14 +328,15 @@
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
         </div>
         <h2>Capture a receipt</h2>
-        <p>Hold the receipt flat under good light. Amount, date and merchant are read automatically.</p>
+        <p>Point at the receipt. It is detected, auto-cropped and read the moment the frame is steady.</p>
         <div class="actions">
           <button class="btn btn-primary" id="btn-capture">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>
-            Capture
+            Scan
           </button>
           <button class="btn btn-outline" id="btn-gallery">From gallery</button>
         </div>
+        <button class="btn-ghost" id="btn-basic" style="font-size:12px;margin-top:12px">Use basic camera instead</button>
       </div>
       <input type="file" accept="image/*" capture="environment" id="file-camera" hidden>
       <input type="file" accept="image/*" multiple id="file-gallery" hidden>
@@ -401,7 +442,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.1</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.3</span></div>
         </div>
       </div>
     </section>
@@ -443,6 +484,30 @@
 </div>
 
 <!-- review sheet -->
+<!-- live camera -->
+<div class="camview" id="camview">
+  <video id="cam-video" playsinline autoplay muted></video>
+  <canvas id="cam-overlay"></canvas>
+  <div class="cam-top">
+    <button class="cam-icon" id="cam-close" aria-label="Close camera">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <button class="cam-icon" id="cam-torch" aria-label="Torch" style="display:none">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+    </button>
+  </div>
+  <div class="cam-bottom">
+    <div class="cam-status" id="cam-status">Point the camera at a receipt</div>
+    <div class="cam-progress" id="cam-progress"><span id="cam-progress-fill"></span></div>
+    <div class="cam-actions">
+      <button class="cam-side" id="cam-addpage">Add page<br>to last</button>
+      <button class="cam-shutter" id="cam-shutter" aria-label="Capture manually"></button>
+      <button class="cam-side" id="cam-done">Done</button>
+    </div>
+    <div class="cam-count" id="cam-count"></div>
+  </div>
+</div>
+
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Review receipt">
   <div class="grab"></div>
@@ -454,7 +519,7 @@
     </div>
   </div>
   <button class="photo-toggle" id="btn-photo-toggle">View full photo</button>
-  <img class="full-photo" id="full-photo" alt="Receipt photo">
+  <div class="full-photos" id="full-photos"></div>
   <div class="warn-strip" id="sheet-warn" style="display:none">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
     <span id="sheet-warn-text"></span>
@@ -579,6 +644,35 @@
     return p || '/Receipts';
   }
 
+  /* =============== persistence (IndexedDB) & sync state =============== */
+  const idb = {db:null};
+  function idbOpen(){
+    return new Promise(res=>{
+      try{
+        const rq = indexedDB.open('receiptsnap', 1);
+        rq.onupgradeneeded = e=>{ e.target.result.createObjectStore('items', {keyPath:'id'}); };
+        rq.onsuccess = e=>{ idb.db = e.target.result; res(true); };
+        rq.onerror = ()=>res(false);
+      }catch(e){ res(false); }
+    });
+  }
+  function saveItem(r){ if(!idb.db) return; try{ idb.db.transaction('items','readwrite').objectStore('items').put(r); }catch(e){} }
+  function deleteItem(id){ if(!idb.db) return; try{ idb.db.transaction('items','readwrite').objectStore('items').delete(id); }catch(e){} }
+  function clearItems(){ if(!idb.db) return; try{ idb.db.transaction('items','readwrite').objectStore('items').clear(); }catch(e){} }
+  function loadItems(){
+    return new Promise(res=>{
+      if(!idb.db) return res([]);
+      try{
+        const rq = idb.db.transaction('items','readonly').objectStore('items').getAll();
+        rq.onsuccess = ()=>res(rq.result||[]);
+        rq.onerror = ()=>res([]);
+      }catch(e){ res([]); }
+    });
+  }
+
+  const sync = {running:false, total:0, done:0, error:''};
+  const isOnline = ()=>navigator.onLine !== false;
+
   /* =============== MSAL / auth =============== */
   let msalApp = null, account = null;
 
@@ -614,7 +708,7 @@
     }
     renderAccount();
     renderBanner();
-    if(account){ loadHistory(false); }
+    if(account){ loadHistory(true); }
   }
 
   async function getToken(){
@@ -864,12 +958,12 @@
   }
 
   /* =============== Claude extraction =============== */
-  const PROMPT = 'Read this receipt photo. Respond with ONLY a JSON object, no markdown, no explanation: {"merchant": string (business name in proper case), "date": "YYYY-MM-DD" or null if unreadable, "total": number (the final amount actually paid, after tax, service charge and rounding) or null, "currency": ISO 4217 code string, "confidence": "high" or "low", "reason": string (only when confidence is low, one short sentence why)}';
+  const PROMPT = 'Read this receipt photo. If more than one image is provided, they are sequential segments of the SAME single receipt, ordered top to bottom. Respond with ONLY a JSON object, no markdown, no explanation: {"merchant": string (business name in proper case), "date": "YYYY-MM-DD" or null if unreadable, "total": number (the final amount actually paid, after tax, service charge and rounding) or null, "currency": ISO 4217 code string, "confidence": "high" or "low", "reason": string (only when confidence is low, one short sentence why)}';
 
   async function extract(receipt){
     const key = S.get('apiKey','');
     if(!key) throw new Error('Anthropic API key missing (Settings)');
-    const b64 = receipt.jpegDataUrl.split(',')[1];
+    const images = receipt.pages.map(p=>({type:'image', source:{type:'base64', media_type:'image/jpeg', data:p.split(',')[1]}}));
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST',
       headers:{
@@ -881,10 +975,7 @@
       body: JSON.stringify({
         model: S.get('model','claude-sonnet-4-6'),
         max_tokens: 400,
-        messages:[{role:'user', content:[
-          {type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64}},
-          {type:'text', text:PROMPT}
-        ]}]
+        messages:[{role:'user', content: images.concat([{type:'text', text:PROMPT}])}]
       })
     });
     if(!res.ok){
@@ -902,56 +993,391 @@
   let nextId = 1;
   let activeId = null;
 
-  $('#btn-capture').addEventListener('click', ()=>$('#file-camera').click());
   $('#btn-gallery').addEventListener('click', ()=>$('#file-gallery').click());
+  $('#btn-basic').addEventListener('click', ()=>$('#file-camera').click());
   $('#file-camera').addEventListener('change', e=>{ handleFiles(e.target.files); e.target.value=''; });
   $('#file-gallery').addEventListener('change', e=>{ handleFiles(e.target.files); e.target.value=''; });
 
   async function handleFiles(fileList){
-    const files = Array.from(fileList||[]);
-    for(const file of files){
-      const r = {
-        id: nextId++,
-        merchant:'', amount:null, dateISO: todayISO(),
-        purpose:null, other:'',
-        flag:false, flagReason:'',
-        status:'reading',
-        jpegDataUrl:null, thumbUrl:null
-      };
-      tray.push(r);
-      renderTray();
+    for(const file of Array.from(fileList||[])){
       try{
         const raw = await fileToDataUrl(file);
-        const big = await downscale(raw, 2000, 0.85);
-        const small = await downscale(raw, 240, 0.7);
-        r.jpegDataUrl = big.dataUrl;
-        r.thumbUrl = small.dataUrl;
-        renderTray();
-        const out = await extract(r);
-        r.merchant = (out.merchant||'').trim() || 'Unknown merchant';
-        r.amount = (typeof out.total==='number' && out.total>0) ? out.total : null;
-        r.dateISO = /^\d{4}-\d{2}-\d{2}$/.test(out.date||'') ? out.date : todayISO();
-        const cur = (out.currency||'MYR').toUpperCase();
-        if(out.confidence==='low'){ r.flag = true; r.flagReason = out.reason || 'The receipt was hard to read.'; }
-        if(cur!=='MYR'){ r.flag = true; r.flagReason = (r.flagReason?r.flagReason+' ':'')+'Currency read as '+cur+', not RM.'; }
-        if(r.amount===null){ r.flag = true; r.flagReason = (r.flagReason?r.flagReason+' ':'')+'Total could not be read; enter it manually.'; r.amount = 0; }
-        r.status = r.flag ? 'warn' : 'review';
-      }catch(e){
-        r.status = 'warn';
-        r.flag = true;
-        r.merchant = r.merchant || 'Unknown merchant';
-        r.amount = r.amount===null ? 0 : r.amount;
-        r.flagReason = e.message + ' Fill the fields in manually.';
-      }
-      renderTray();
+        await addReceiptFromDataUrl(raw);
+      }catch(e){ toast(e.message); }
     }
+  }
+
+  async function addReceiptFromDataUrl(raw){
+    const r = {
+      id: nextId++,
+      merchant:'', amount:null, dateISO: todayISO(),
+      purpose:null, other:'',
+      flag:false, flagReason:'',
+      status:'reading',
+      pages:[], thumbUrl:null
+    };
+    tray.push(r);
+    renderTray();
+    try{
+      const big = await downscale(raw, 3000, 0.85);
+      const small = await downscale(raw, 240, 0.7);
+      r.pages = [big.dataUrl];
+      r.thumbUrl = small.dataUrl;
+      saveItem(r);
+      renderTray();
+      await runExtraction(r);
+    }catch(e){ failItem(r, e); }
+    saveItem(r);
+    renderTray();
+    return r;
+  }
+
+  async function runExtraction(r){
+    try{
+      const out = await extract(r);
+      r.merchant = (out.merchant||'').trim() || 'Unknown merchant';
+      r.amount = (typeof out.total==='number' && out.total>0) ? out.total : null;
+      r.dateISO = /^\d{4}-\d{2}-\d{2}$/.test(out.date||'') ? out.date : todayISO();
+      const cur = (out.currency||'MYR').toUpperCase();
+      r.flag = false; r.flagReason = '';
+      if(out.confidence==='low'){ r.flag = true; r.flagReason = out.reason || 'The receipt was hard to read.'; }
+      if(cur!=='MYR'){ r.flag = true; r.flagReason = (r.flagReason?r.flagReason+' ':'')+'Currency read as '+cur+', not RM.'; }
+      if(r.amount===null){ r.flag = true; r.flagReason = (r.flagReason?r.flagReason+' ':'')+'Total could not be read; enter it manually.'; r.amount = 0; }
+      r.status = r.flag ? 'warn' : 'review';
+    }catch(e){ failItem(r, e); }
+    saveItem(r);
+  }
+
+  function failItem(r, e){
+    const msg = (e && e.message) ? e.message : 'Reading failed.';
+    const offline = !isOnline() || /failed to fetch|networkerror|load failed/i.test(msg);
+    if(offline){
+      r.status = 'pending-read';
+      r.flag = false; r.flagReason = '';
+      if(!r.merchant) r.merchant = 'Receipt (not read yet)';
+      if(r.amount===null) r.amount = 0;
+      return;
+    }
+    r.status = 'warn';
+    r.flag = true;
+    r.merchant = r.merchant || 'Unknown merchant';
+    if(r.amount===null) r.amount = 0;
+    r.flagReason = msg + ' Fill the fields in manually.';
+  }
+
+  async function reExtract(r){
+    r.status = 'reading';
+    renderTray();
+    await runExtraction(r);
+    renderTray();
+  }
+
+  /* =============== live camera with edge detection =============== */
+  const CV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.11.0-release.1/dist/opencv.js';
+  const CV_BYTES = 11386540; // decompressed size, used when Content-Length reports the compressed size
+  const DET_W = 340, STABLE_N = 9, MOVE_TOL = 10;
+  let cvLoad = null;
+
+  function loadCv(onProgress){
+    if(cvLoad) return cvLoad;
+    cvLoad = (async ()=>{
+      let res = null, fromCache = false;
+      try{
+        const c = await caches.open('receiptsnap-libs');
+        res = await c.match(CV_URL);
+        fromCache = !!res;
+      }catch(e){}
+      if(!res){
+        res = await fetch(CV_URL);
+        if(!res.ok) throw new Error('Could not download the detector ('+res.status+')');
+        try{
+          const c = await caches.open('receiptsnap-libs');
+          await c.put(CV_URL, res.clone());
+        }catch(e){}
+      }
+      const headerLen = +res.headers.get('Content-Length') || 0;
+      const denom = fromCache ? 0 : (headerLen > 8*1024*1024 ? headerLen : CV_BYTES);
+      const reader = res.body.getReader();
+      const chunks = []; let received = 0;
+      while(true){
+        const {done, value} = await reader.read();
+        if(done) break;
+        chunks.push(value); received += value.length;
+        if(onProgress && denom) onProgress(Math.min(99, Math.round(received/denom*100)), received);
+      }
+      if(onProgress) onProgress(100, received);
+      const objUrl = URL.createObjectURL(new Blob(chunks, {type:'text/javascript'}));
+      await new Promise((res2, rej2)=>{
+        const s = document.createElement('script');
+        s.src = objUrl;
+        s.onload = res2;
+        s.onerror = ()=>rej2(new Error('Detector script failed to run'));
+        document.head.appendChild(s);
+      });
+      URL.revokeObjectURL(objUrl);
+      let m = window.cv;
+      if(m && typeof m.then === 'function'){ m = await m; window.cv = m; }
+      if(m && m.Mat) return;
+      if(m){ await new Promise(res3=>{ m.onRuntimeInitialized = res3; }); return; }
+      throw new Error('Detector failed to initialise');
+    })();
+    cvLoad.catch(()=>{ cvLoad = null; }); // allow retry on next camera open
+    return cvLoad;
+  }
+  const cvOk = ()=> typeof window.cv !== 'undefined' && !!window.cv.Mat;
+
+  const cam = {running:false, stream:null, raf:0, lastT:0, stable:0, lastQuad:null, appendToLast:false, track:null, torchOn:false, busy:false};
+  const camStatus = t => { $('#cam-status').textContent = t; };
+  const updateCamCount = ()=>{ $('#cam-count').textContent = tray.length ? tray.length+(tray.length===1?' receipt':' receipts')+' in batch' : ''; };
+
+  $('#btn-capture').addEventListener('click', openCamera);
+
+  async function openCamera(){
+    $('#camview').classList.add('show');
+    updateCamCount();
+    camStatus('Starting camera…');
+    try{
+      cam.stream = await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:'environment', width:{ideal:2560}, height:{ideal:1440}},
+        audio:false
+      });
+    }catch(e){
+      closeCamera();
+      toast('Camera unavailable ('+(e.name||'error')+'). Opening basic capture.');
+      $('#file-camera').click();
+      return;
+    }
+    const v = $('#cam-video');
+    v.srcObject = cam.stream;
+    await v.play().catch(()=>{});
+    cam.track = cam.stream.getVideoTracks()[0];
+    try{
+      const caps = cam.track.getCapabilities ? cam.track.getCapabilities() : {};
+      $('#cam-torch').style.display = caps.torch ? 'flex' : 'none';
+    }catch(e){}
+    if(!cvOk()){
+      const bar = $('#cam-progress'), fill = $('#cam-progress-fill');
+      bar.classList.add('show'); fill.style.width = '0%';
+      camStatus('Downloading detector (one-time)…');
+      try{
+        await loadCv((pct, bytes)=>{
+          fill.style.width = pct+'%';
+          camStatus(pct>=100 ? 'Starting detector…' : 'Downloading detector (one-time)… '+pct+'% · '+(bytes/1048576).toFixed(1)+' MB');
+        });
+      }
+      catch(e){ camStatus('Detector unavailable ('+e.message+') — tap the shutter to capture the full frame'); }
+      bar.classList.remove('show');
+    }
+    cam.running = true; cam.busy = false;
+    cam.stable = 0; cam.lastQuad = null; cam.lastT = 0;
+    if(cvOk()) camStatus('Point the camera at a receipt');
+    camLoop();
+  }
+
+  function closeCamera(){
+    cam.running = false;
+    cancelAnimationFrame(cam.raf);
+    if(cam.stream){ cam.stream.getTracks().forEach(t=>t.stop()); cam.stream = null; }
+    cam.appendToLast = false;
+    $('#cam-addpage').classList.remove('on');
+    cam.torchOn = false;
+    $('#cam-torch').classList.remove('on');
+    $('#camview').classList.remove('show');
+  }
+  $('#cam-close').addEventListener('click', closeCamera);
+  $('#cam-done').addEventListener('click', closeCamera);
+
+  $('#cam-torch').addEventListener('click', async ()=>{
+    if(!cam.track) return;
+    cam.torchOn = !cam.torchOn;
+    try{ await cam.track.applyConstraints({advanced:[{torch:cam.torchOn}]}); }catch(e){}
+    $('#cam-torch').classList.toggle('on', cam.torchOn);
+  });
+
+  $('#cam-addpage').addEventListener('click', ()=>{
+    if(!tray.length){ toast('Scan a receipt first, then add pages to it'); return; }
+    cam.appendToLast = !cam.appendToLast;
+    $('#cam-addpage').classList.toggle('on', cam.appendToLast);
+    camStatus(cam.appendToLast ? 'Next capture adds a page to the last receipt' : 'Point the camera at a receipt');
+  });
+
+  $('#cam-shutter').addEventListener('click', ()=>{ if(cam.running && !cam.busy) captureFrame(cam.lastQuad); });
+
+  function camLoop(){
+    if(!cam.running) return;
+    cam.raf = requestAnimationFrame(camLoop);
+    const now = performance.now();
+    if(now - cam.lastT < 90) return;
+    cam.lastT = now;
+    const v = $('#cam-video');
+    if(!v.videoWidth) return;
+    if(!cvOk()){ drawOverlay(null,false); return; }
+    const detH = Math.round(DET_W * v.videoHeight / v.videoWidth);
+    const c = document.createElement('canvas');
+    c.width = DET_W; c.height = detH;
+    const ctx = c.getContext('2d', {willReadFrequently:true});
+    ctx.drawImage(v, 0, 0, DET_W, detH);
+    let quad = null;
+    try{ quad = detectQuad(ctx.getImageData(0,0,DET_W,detH), DET_W, detH); }catch(e){ quad = null; }
+    if(quad && cam.lastQuad){
+      const move = ['tl','tr','br','bl'].reduce((s,k)=>s+Math.hypot(quad[k].x-cam.lastQuad[k].x, quad[k].y-cam.lastQuad[k].y), 0);
+      cam.stable = move < MOVE_TOL*4 ? cam.stable+1 : 0;
+    }else{
+      cam.stable = 0;
+    }
+    cam.lastQuad = quad;
+    const stable = cam.stable >= STABLE_N;
+    drawOverlay(quad, stable);
+    if(!cam.busy){
+      if(quad) camStatus(stable ? 'Capturing…' : 'Hold steady…');
+      else camStatus(cam.appendToLast ? 'Next capture adds a page to the last receipt' : 'Point the camera at a receipt');
+    }
+    if(stable && !cam.busy) captureFrame(quad);
+  }
+
+  function detectQuad(imgData, W, H){
+    const cvm = window.cv;
+    const src = cvm.matFromImageData(imgData);
+    const gray = new cvm.Mat(), blur = new cvm.Mat(), edges = new cvm.Mat();
+    cvm.cvtColor(src, gray, cvm.COLOR_RGBA2GRAY);
+    cvm.GaussianBlur(gray, blur, new cvm.Size(5,5), 0);
+    cvm.Canny(blur, edges, 40, 120);
+    const kernel = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(3,3));
+    cvm.dilate(edges, edges, kernel);
+    const contours = new cvm.MatVector(), hier = new cvm.Mat();
+    cvm.findContours(edges, contours, hier, cvm.RETR_EXTERNAL, cvm.CHAIN_APPROX_SIMPLE);
+    let best = null, bestArea = 0;
+    for(let i=0; i<contours.size(); i++){
+      const cnt = contours.get(i);
+      const area = cvm.contourArea(cnt);
+      if(area > 0.07*W*H && area > bestArea){
+        const peri = cvm.arcLength(cnt, true);
+        const approx = new cvm.Mat();
+        cvm.approxPolyDP(cnt, approx, 0.02*peri, true);
+        if(approx.rows === 4 && cvm.isContourConvex(approx)){
+          const pts = [];
+          for(let j=0; j<4; j++) pts.push({x:approx.data32S[j*2], y:approx.data32S[j*2+1]});
+          const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+          const bw = Math.max.apply(null,xs)-Math.min.apply(null,xs);
+          const bh = Math.max.apply(null,ys)-Math.min.apply(null,ys);
+          if(bw > 0.35*W || bh > 0.45*H){ best = orderQuad(pts); bestArea = area; }
+        }
+        approx.delete();
+      }
+      cnt.delete();
+    }
+    src.delete(); gray.delete(); blur.delete(); edges.delete(); kernel.delete(); contours.delete(); hier.delete();
+    return best;
+  }
+
+  function orderQuad(pts){
+    const bySum = pts.slice().sort((a,b)=>(a.x+a.y)-(b.x+b.y));
+    const byDiff = pts.slice().sort((a,b)=>(a.y-a.x)-(b.y-b.x));
+    return {tl:bySum[0], br:bySum[3], tr:byDiff[0], bl:byDiff[3]};
+  }
+
+  function expandQuad(q, k){
+    const cx = (q.tl.x+q.tr.x+q.br.x+q.bl.x)/4, cy = (q.tl.y+q.tr.y+q.br.y+q.bl.y)/4;
+    const ex = p => ({x: cx + (p.x-cx)*k, y: cy + (p.y-cy)*k});
+    return {tl:ex(q.tl), tr:ex(q.tr), br:ex(q.br), bl:ex(q.bl)};
+  }
+
+  function drawOverlay(quad, stable){
+    const cnv = $('#cam-overlay'), v = $('#cam-video');
+    const dw = cnv.clientWidth, dh = cnv.clientHeight, dpr = window.devicePixelRatio || 1;
+    if(cnv.width !== Math.round(dw*dpr)){ cnv.width = Math.round(dw*dpr); cnv.height = Math.round(dh*dpr); }
+    const ctx = cnv.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,dw,dh);
+    if(!quad || !v.videoWidth) return;
+    const s = Math.max(dw/v.videoWidth, dh/v.videoHeight);
+    const ox = (dw - v.videoWidth*s)/2, oy = (dh - v.videoHeight*s)/2;
+    const k = v.videoWidth / DET_W;
+    const P = p => ({x: p.x*k*s + ox, y: p.y*k*s + oy});
+    const pts = [P(quad.tl), P(quad.tr), P(quad.br), P(quad.bl)];
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for(let i=1; i<4; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.fillStyle = stable ? 'rgba(52,211,153,.16)' : 'rgba(255,255,255,.10)';
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = stable ? '#34d399' : 'rgba(255,255,255,.9)';
+    ctx.stroke();
+  }
+
+  async function captureFrame(quad){
+    if(cam.busy) return;
+    cam.busy = true;
+    camStatus('Captured');
+    const v = $('#cam-video');
+    const fc = document.createElement('canvas');
+    fc.width = v.videoWidth; fc.height = v.videoHeight;
+    fc.getContext('2d').drawImage(v, 0, 0);
+    let dataUrl;
+    if(quad && cvOk()){
+      try{ dataUrl = warpFromCanvas(fc, expandQuad(quad, 1.02), v.videoWidth/DET_W); }
+      catch(e){ dataUrl = fc.toDataURL('image/jpeg', 0.87); }
+    }else{
+      dataUrl = fc.toDataURL('image/jpeg', 0.87);
+    }
+    if(navigator.vibrate) navigator.vibrate(40);
+    if(cam.appendToLast && tray.length){
+      cam.appendToLast = false;
+      $('#cam-addpage').classList.remove('on');
+      const r = tray[tray.length-1];
+      const big = await downscale(dataUrl, 3000, 0.85);
+      r.pages.push(big.dataUrl);
+      saveItem(r);
+      reExtract(r);
+      toast('Page '+r.pages.length+' added to '+(r.merchant||'last receipt'));
+    }else{
+      addReceiptFromDataUrl(dataUrl);
+    }
+    updateCamCount();
+    setTimeout(()=>{
+      cam.busy = false;
+      cam.stable = 0; cam.lastQuad = null;
+      if(cam.running) camStatus('Point the camera at the next receipt');
+    }, 1300);
+  }
+
+  function warpFromCanvas(canvas, q, k){
+    const cvm = window.cv;
+    const ctx = canvas.getContext('2d');
+    const clamp = (p)=>({x:Math.min(Math.max(p.x*k,0),canvas.width-1), y:Math.min(Math.max(p.y*k,0),canvas.height-1)});
+    const tl = clamp(q.tl), tr = clamp(q.tr), br = clamp(q.br), bl = clamp(q.bl);
+    const d = (a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+    let w = Math.max(d(tl,tr), d(bl,br)), h = Math.max(d(tl,bl), d(tr,br));
+    const long = Math.max(w,h);
+    if(long > 3000){ const sc = 3000/long; w *= sc; h *= sc; }
+    w = Math.max(64, Math.round(w)); h = Math.max(64, Math.round(h));
+    const src = cvm.matFromImageData(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    const srcPts = cvm.matFromArray(4, 1, cvm.CV_32FC2, [tl.x,tl.y, tr.x,tr.y, br.x,br.y, bl.x,bl.y]);
+    const dstPts = cvm.matFromArray(4, 1, cvm.CV_32FC2, [0,0, w,0, w,h, 0,h]);
+    const M = cvm.getPerspectiveTransform(srcPts, dstPts);
+    const out = new cvm.Mat();
+    cvm.warpPerspective(src, out, M, new cvm.Size(w,h), cvm.INTER_LINEAR, cvm.BORDER_REPLICATE);
+    const oc = document.createElement('canvas');
+    oc.width = w; oc.height = h;
+    cvm.imshow(oc, out);
+    const url = oc.toDataURL('image/jpeg', 0.87);
+    src.delete(); srcPts.delete(); dstPts.delete(); M.delete(); out.delete();
+    return url;
   }
 
   function statusPill(r){
     if(r.status==='reading') return '<span class="pill pill-reading"><span class="spin"></span>Reading</span>';
+    if(r.status==='pending-read') return '<span class="pill pill-sync"><span class="dot"></span>Waiting for connection</span>';
+    if(r.status==='queued')  return '<span class="pill pill-sync"><span class="dot"></span>Queued for sync</span>';
     if(r.status==='warn')    return '<span class="pill pill-warn"><span class="dot"></span>Check details</span>';
     if(r.status==='ready')   return '<span class="pill pill-ready"><span class="dot"></span>Ready</span>';
     return '<span class="pill pill-review"><span class="dot"></span>Needs review</span>';
+  }
+
+  function trayRemove(id){
+    tray = tray.filter(x=>x.id!==id);
+    deleteItem(id);
   }
 
   function renderTray(){
@@ -976,6 +1402,7 @@
       card.addEventListener('click', ()=>openSheet(+card.dataset.id));
     });
     renderSubmitBar();
+    renderSyncBanner();
   }
 
   function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -984,17 +1411,24 @@
   function renderSubmitBar(){
     const bar = $('#submitbar');
     const onScan = $('#view-scan').classList.contains('active');
-    if(!onScan || tray.length===0){ bar.classList.remove('show'); return; }
+    const queued = tray.filter(r=>r.status==='queued').length;
+    const actionable = tray.length - queued;
+    if(!onScan || actionable===0){ bar.classList.remove('show'); return; }
     bar.classList.add('show');
     const ready = tray.filter(r=>r.status==='ready');
-    const pending = tray.length - ready.length;
+    const pending = actionable - ready.length;
     const total = ready.reduce((s,r)=>s+r.amount,0);
     const btn = $('#btn-submit');
     const probs = setupProblems();
     if(pending===0 && probs.length===0){
       btn.disabled = false;
-      btn.innerHTML = 'Submit '+tray.length+(tray.length===1?' receipt':' receipts')+' · <span class="amt">RM '+fmt(total)+'</span>';
-      $('#submit-hint').textContent = 'PDFs go to '+basePath()+'/'+curYM()+'/, one row each into '+WB_NAME+'.';
+      if(!isOnline()){
+        btn.innerHTML = 'Queue '+ready.length+(ready.length===1?' receipt':' receipts')+' for sync · <span class="amt">RM '+fmt(total)+'</span>';
+        $('#submit-hint').textContent = 'Offline — they will file automatically when you reconnect.';
+      }else{
+        btn.innerHTML = 'Submit '+ready.length+(ready.length===1?' receipt':' receipts')+' · <span class="amt">RM '+fmt(total)+'</span>';
+        $('#submit-hint').textContent = 'PDFs go to '+basePath()+'/'+curYM()+'/, one row each into '+WB_NAME+'.';
+      }
     }else{
       btn.disabled = true;
       btn.innerHTML = 'Submit batch';
@@ -1009,9 +1443,9 @@
     if(!r || r.status==='reading') return;
     activeId = id;
     $('#sheet-thumb').innerHTML = r.thumbUrl ? '<img src="'+r.thumbUrl+'" alt="" style="width:100%;height:100%;object-fit:cover">' : '';
-    $('#full-photo').src = r.jpegDataUrl || '';
-    $('#full-photo').classList.remove('show');
-    $('#btn-photo-toggle').textContent = 'View full photo';
+    $('#full-photos').innerHTML = (r.pages||[]).map(p=>'<img src="'+p+'" alt="Receipt page">').join('');
+    $('#full-photos').classList.remove('show');
+    $('#btn-photo-toggle').textContent = 'View full photo' + (r.pages && r.pages.length>1 ? ' ('+r.pages.length+' pages)' : '');
     $('#sheet-warn').style.display = r.flag ? 'flex':'none';
     $('#sheet-warn-text').textContent = r.flagReason || 'Double-check the details against the paper copy.';
     $('#f-merchant').value = r.merchant;
@@ -1030,9 +1464,10 @@
   }
   $('#scrim').addEventListener('click', ()=>{ closeSheet(); closePurge(); });
   $('#btn-photo-toggle').addEventListener('click', ()=>{
-    const p = $('#full-photo');
+    const p = $('#full-photos');
     p.classList.toggle('show');
-    $('#btn-photo-toggle').textContent = p.classList.contains('show') ? 'Hide full photo' : 'View full photo';
+    const n = p.children.length;
+    $('#btn-photo-toggle').textContent = (p.classList.contains('show') ? 'Hide full photo' : 'View full photo') + (n>1 ? ' ('+n+' pages)' : '');
   });
 
   function renderChips(selected){
@@ -1063,12 +1498,13 @@
     r.other = $('#f-other').value.trim();
     r.status = 'ready';
     r.flag = false;
+    saveItem(r);
     closeSheet();
     renderTray();
   });
 
   $('#btn-remove').addEventListener('click', ()=>{
-    tray = tray.filter(x=>x.id!==activeId);
+    trayRemove(activeId);
     closeSheet();
     renderTray();
     toast('Receipt removed');
@@ -1081,12 +1517,16 @@
 
   async function makePdf(r){
     const {jsPDF} = window.jspdf;
-    const img = new Image();
-    await new Promise(res=>{ img.onload=res; img.src=r.jpegDataUrl; });
-    const wmm = 210;
-    const hmm = Math.max(60, wmm * img.height / img.width);
-    const pdf = new jsPDF({unit:'mm', format:[wmm, hmm], compress:true});
-    pdf.addImage(r.jpegDataUrl, 'JPEG', 0, 0, wmm, hmm);
+    let pdf = null;
+    for(const page of r.pages){
+      const img = new Image();
+      await new Promise(res=>{ img.onload=res; img.src=page; });
+      const wmm = 210;
+      const hmm = Math.max(60, wmm * img.height / img.width);
+      if(!pdf) pdf = new jsPDF({unit:'mm', format:[wmm, hmm], compress:true});
+      else pdf.addPage([wmm, hmm]);
+      pdf.addImage(page, 'JPEG', 0, 0, wmm, hmm);
+    }
     return pdf.output('blob');
   }
 
@@ -1128,6 +1568,19 @@
     }
   }
 
+  async function fileReceipt(r, onStep){
+    if(onStep) onStep(0);
+    const pdfBlob = await makePdf(r);
+    if(onStep) onStep(1);
+    const fname = r.dateISO+'_'+sanitizeName(r.merchant)+'_RM'+r.amount.toFixed(2)+'.pdf';
+    const ym = r.dateISO.slice(0,7);
+    const uploaded = await uploadPdf(pdfBlob, basePath()+'/'+ym+'/'+fname);
+    if(onStep) onStep(2);
+    const purposeText = r.purpose==='Others' ? r.other : r.purpose;
+    await appendRow([r.dateISO, r.merchant, purposeText, r.amount, (uploaded&&uploaded.webUrl)||'', nowStamp()]);
+    return uploaded;
+  }
+
   /* =============== submit flow =============== */
   const STEPS = ['Creating PDF','Uploading to OneDrive','Adding row to '+WB_NAME];
   const CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
@@ -1135,9 +1588,16 @@
   let submitting = false;
 
   $('#btn-submit').addEventListener('click', async ()=>{
-    if($('#btn-submit').disabled || submitting) return;
+    if($('#btn-submit').disabled || submitting || sync.running) return;
+    if(!isOnline()){
+      const ready = tray.filter(r=>r.status==='ready');
+      ready.forEach(r=>{ r.status = 'queued'; saveItem(r); });
+      renderTray();
+      toast(ready.length+(ready.length===1?' receipt':' receipts')+' queued — will file when you reconnect');
+      return;
+    }
     submitting = true;
-    const batch = tray.slice();
+    const batch = tray.filter(r=>r.status==='ready');
     $('#overlay').classList.add('show');
     $('#prog-phase').style.display = 'block';
     $('#prog-actions').style.display = 'none';
@@ -1165,18 +1625,13 @@
       for(const r of batch){
         const item = list.querySelector('[data-id="'+r.id+'"]');
         try{
-          mark(r.id, 0, 'doing');
-          const pdfBlob = await makePdf(r);
-          mark(r.id, 0, 'done'); mark(r.id, 1, 'doing');
-          const fname = r.dateISO+'_'+sanitizeName(r.merchant)+'_RM'+r.amount.toFixed(2)+'.pdf';
-          const ym = r.dateISO.slice(0,7);
-          const uploaded = await uploadPdf(pdfBlob, basePath()+'/'+ym+'/'+fname);
-          mark(r.id, 1, 'done'); mark(r.id, 2, 'doing');
-          const purposeText = r.purpose==='Others' ? r.other : r.purpose;
-          await appendRow([r.dateISO, r.merchant, purposeText, r.amount, (uploaded&&uploaded.webUrl)||'', nowStamp()]);
+          await fileReceipt(r, i=>{
+            if(i>0) mark(r.id, i-1, 'done');
+            if(i<STEPS.length) mark(r.id, i, 'doing');
+          });
           mark(r.id, 2, 'done');
           filed.push(r);
-          tray = tray.filter(x=>x.id!==r.id);
+          trayRemove(r.id);
           renderTray();
         }catch(e){
           item.classList.add('failed');
@@ -1340,6 +1795,85 @@
     $('#topbar').classList.toggle('scrolled', e.target.scrollTop > 4);
   });
 
+  /* =============== connectivity & background sync =============== */
+  function renderConn(){
+    const el = $('#conn');
+    if(!isOnline()){ el.className = 'conn off'; el.innerHTML = '<span class="dot"></span>Offline'; }
+    else if(sync.running){ el.className = 'conn syncing'; el.innerHTML = '<span class="dot"></span>Syncing'; }
+    else { el.className = 'conn'; el.innerHTML = '<span class="dot"></span>Online'; }
+  }
+
+  function renderSyncBanner(msgOverride){
+    const q = tray.filter(r=>r.status==='queued').length;
+    const p = tray.filter(r=>r.status==='pending-read').length;
+    const b = $('#sync-banner'), t = $('#sync-banner-text'), retry = $('#btn-sync-retry');
+    retry.style.display = 'none';
+    if(sync.running){
+      b.style.display = 'flex';
+      t.textContent = 'Syncing — filing '+Math.min(sync.done+1, sync.total)+' of '+sync.total+' queued receipt'+(sync.total>1?'s':'')+'…';
+      return;
+    }
+    if(msgOverride){ b.style.display = 'flex'; t.textContent = msgOverride; return; }
+    if(sync.error && q){
+      b.style.display = 'flex';
+      t.textContent = 'Sync stopped: '+sync.error+' '+q+' receipt'+(q>1?'s':'')+' still queued.';
+      retry.style.display = 'inline';
+      return;
+    }
+    if(!isOnline() && (q || p)){
+      const parts = [];
+      if(q) parts.push(q+' confirmed receipt'+(q>1?'s':'')+' queued to file');
+      if(p) parts.push(p+' waiting to be read');
+      b.style.display = 'flex';
+      t.textContent = 'Offline — '+parts.join(', ')+'. Everything syncs automatically when you reconnect.';
+      return;
+    }
+    if(!isOnline()){
+      b.style.display = 'flex';
+      t.textContent = 'Offline — you can keep scanning and reviewing; receipts will sync when you reconnect.';
+      return;
+    }
+    b.style.display = 'none';
+  }
+  $('#btn-sync-retry').addEventListener('click', ()=>{ sync.error=''; syncQueues(); });
+
+  async function syncQueues(){
+    if(sync.running || submitting || !isOnline()) return;
+    // Stage 1: read receipts that were captured offline
+    const pend = tray.filter(r=>r.status==='pending-read');
+    for(const r of pend){
+      if(!isOnline()) break;
+      await reExtract(r);
+    }
+    // Stage 2: file receipts confirmed while offline
+    const q = tray.filter(r=>r.status==='queued');
+    if(!q.length){ renderConn(); renderSyncBanner(); return; }
+    if(!account){ renderSyncBanner('Sign in to Microsoft 365 (Settings) to file '+q.length+' queued receipt'+(q.length>1?'s':'')+'.'); return; }
+    sync.running = true; sync.total = q.length; sync.done = 0; sync.error = '';
+    renderConn(); renderSyncBanner();
+    const filed = [];
+    try{
+      await ensureWorkbook();
+      for(const r of q){
+        try{
+          await fileReceipt(r);
+          filed.push(r);
+          trayRemove(r.id);
+          sync.done++;
+          renderTray();
+          renderSyncBanner();
+        }catch(e){ sync.error = e.message; break; }
+      }
+    }catch(e){ sync.error = e.message; }
+    sync.running = false;
+    if(filed.length) appendLocalHistory(filed);
+    renderTray(); renderConn(); renderSyncBanner();
+    if(filed.length && !sync.error){
+      toast(filed.length+(filed.length===1?' receipt':' receipts')+' synced to OneDrive');
+      loadHistory(true);
+    }
+  }
+
   /* =============== purge / reset =============== */
   function closePurge(){
     $('#purge-sheet').classList.remove('show');
@@ -1373,6 +1907,7 @@
       historyRows = [];
       S.set('historyCache', []);
       tray = [];
+      clearItems();
       renderTray(); renderHistory(); renderMonthChart();
       st.className = 'setup-status ok';
       st.textContent = 'Done. The folder and workbook will be recreated automatically on your next batch.';
@@ -1402,17 +1937,32 @@
   if(S.get('model','')==='claude-haiku-4-5-20251001' && !S.get('migSonnet',false)){
     S.set('model','claude-sonnet-4-6'); S.set('migSonnet',true);
   }
-  loadSettings();
-  renderHistory();
-  renderMonthChart();
-  renderTray();
-  renderBanner();
-  handleWide();
-  initAuth();
+  (async ()=>{
+    await idbOpen();
+    const saved = await loadItems();
+    if(saved.length){
+      tray = saved.filter(r=>r && r.pages && r.pages.length).sort((a,b)=>a.id-b.id);
+      if(tray.length) nextId = Math.max.apply(null, tray.map(r=>r.id)) + 1;
+      // items stuck mid-read from a previous session wait for the next sync pass
+      tray.forEach(r=>{ if(r.status==='reading'){ r.status = 'pending-read'; saveItem(r); } });
+    }
+    loadSettings();
+    renderHistory();
+    renderMonthChart();
+    renderTray();
+    renderBanner();
+    renderConn();
+    renderSyncBanner();
+    handleWide();
+    initAuth();
+    window.addEventListener('online', ()=>{ renderConn(); renderTray(); syncQueues(); });
+    window.addEventListener('offline', ()=>{ renderConn(); renderTray(); });
+    if(isOnline()) setTimeout(syncQueues, 1200);
 
-  if('serviceWorker' in navigator && location.protocol==='https:'){
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
-  }
+    if('serviceWorker' in navigator && location.protocol==='https:'){
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+    }
+  })();
 })();
 </script>
 </body>
