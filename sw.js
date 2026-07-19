@@ -1,4 +1,4 @@
-const CACHE = 'receiptsnap-v3';
+const CACHE = 'receiptsnap-v4';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

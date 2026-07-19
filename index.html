@@ -35,13 +35,13 @@
     --mono:'Geist Mono',ui-monospace,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
+  html,body{height:100%;overflow:hidden}
   body{font-family:var(--font);background:var(--page);color:var(--fg);-webkit-font-smoothing:antialiased;display:flex;justify-content:center}
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
   input,select,textarea{font-family:inherit;color:inherit}
   :focus-visible{outline:2px solid #a1a1aa;outline-offset:2px;border-radius:4px}
 
-  .phone{width:100%;max-width:430px;min-height:100dvh;background:var(--bg);display:flex;flex-direction:column;position:relative;border-left:1px solid var(--border);border-right:1px solid var(--border)}
+  .phone{width:100%;max-width:430px;height:100vh;height:100dvh;background:var(--bg);display:flex;flex-direction:column;position:relative;border-left:1px solid var(--border);border-right:1px solid var(--border)}
 
   .topbar{padding:calc(16px + env(safe-area-inset-top)) 20px 14px;background:var(--bg);position:sticky;top:0;z-index:20;border-bottom:1px solid transparent}
   .topbar.scrolled{border-bottom-color:var(--border)}
@@ -221,6 +221,43 @@
   .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:var(--fg);color:#fff;font-size:13px;font-weight:500;padding:10px 16px;border-radius:999px;box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:all .25s;z-index:70;max-width:88vw;text-align:center}
   .toast.show{opacity:1;transform:translate(-50%,0)}
 
+  /* ---------- custom select (shadcn-style) ---------- */
+  .sel{position:relative}
+  .sel-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;font-size:14px;font-weight:500;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--card);text-align:left;transition:border-color .15s}
+  .sel-trigger:hover{border-color:var(--border-strong)}
+  .sel.open .sel-trigger{border-color:var(--muted-2)}
+  .sel-trigger svg{color:var(--muted-2);flex:none;transition:transform .15s}
+  .sel.open .sel-trigger svg{transform:rotate(180deg)}
+  .sel-pop{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:35;background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-lg);padding:4px;display:none;max-height:280px;overflow-y:auto}
+  .sel.open .sel-pop{display:block}
+  .sel-search{position:sticky;top:-4px;margin:-4px -4px 6px;padding:10px 12px;background:var(--card);border:none;border-bottom:1px solid var(--border);width:calc(100% + 8px);font-size:13.5px;outline:none}
+  .sel-opt{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;padding:9px 10px;border-radius:6px;font-size:13.5px;font-weight:500}
+  .sel-opt:hover{background:#f4f4f5}
+  .sel-opt .d{display:block;font-size:11.5px;color:var(--muted);font-weight:400;margin-top:1px}
+  .sel-opt svg{color:var(--fg);flex:none}
+  .sel-empty{padding:12px;text-align:center;font-size:13px;color:var(--muted-2)}
+
+  /* ---------- danger zone ---------- */
+  .set-card.danger{border-color:var(--danger-bd)}
+  .dz-text{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+  .btn-danger{background:var(--danger);color:#fff}
+  .btn-danger:hover{background:#b91c1c}
+  .btn-danger:disabled{opacity:.4;cursor:not-allowed}
+
+  /* ---------- wide / foldable layout ---------- */
+  .pane-main,.pane-side{display:contents}
+  .side-head{display:none}
+  @media (min-width:700px){
+    .phone{max-width:1040px}
+    main{display:grid;grid-template-columns:minmax(0,1fr) 360px;padding:0;overflow:hidden}
+    .pane-main{display:block;overflow-y:auto;padding:4px 20px 160px;min-width:0;scroll-behavior:smooth}
+    .pane-side{display:block;overflow-y:auto;padding:4px 16px 40px;border-left:1px solid var(--border);min-width:0}
+    .side-head{display:block;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:20px 4px 0}
+    #view-history{display:block}
+    .tab[data-tab="history"]{display:none}
+    .submitbar{right:360px}
+  }
+
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
   }
@@ -237,6 +274,7 @@
   </header>
 
   <main id="main">
+   <div class="pane-main">
 
     <!-- ============ SCAN ============ -->
     <section class="view active" id="view-scan">
@@ -276,16 +314,6 @@
         </div>
         <div id="mc-bars"></div>
       </div>
-    </section>
-
-    <!-- ============ HISTORY ============ -->
-    <section class="view" id="view-history">
-      <div class="sync-note">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 .42-8.98 6 6 0 0 0-11.7 1.62A4 4 0 0 0 7 19h10.5z"/><path d="m9 15 2 2 4-4"/></svg>
-        <span id="sync-label">Synced with /Receipts/Claims.xlsx</span>
-        <button class="refresh" id="btn-refresh">Refresh</button>
-      </div>
-      <div id="history"></div>
     </section>
 
     <!-- ============ SETTINGS ============ -->
@@ -335,11 +363,9 @@
             <div class="help">Stored on this device only. Used to read merchant, date and amount from photos.</div>
           </div>
           <div class="field">
-            <label for="s-model">Model</label>
-            <select class="select" id="s-model">
-              <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fast, lower cost</option>
-              <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — for hard-to-read receipts</option>
-            </select>
+            <label>Model</label>
+            <div class="sel" id="sel-model"></div>
+            <div class="help">Sonnet reads dates and faded thermal receipts far more reliably. Haiku is cheaper per scan if quality holds for your receipts.</div>
           </div>
         </div>
       </div>
@@ -365,12 +391,34 @@
         </div>
       </div>
 
+      <div class="set-section">
+        <h3>Danger zone</h3>
+        <div class="set-card danger">
+          <p class="dz-text" id="dz-text">Erase every scanned receipt: deletes the whole receipts folder in OneDrive (all PDFs and Claims.xlsx), the history cache on this phone, and any receipts in the batch tray. Sign-in, API key and labels are kept.</p>
+          <button class="btn btn-danger" id="btn-purge-open" style="width:100%">Erase all scanned data…</button>
+        </div>
+      </div>
+
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.0</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.1</span></div>
         </div>
       </div>
     </section>
+   </div>
+
+   <div class="pane-side">
+    <div class="side-head">History</div>
+    <!-- ============ HISTORY ============ -->
+    <section class="view" id="view-history">
+      <div class="sync-note">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 .42-8.98 6 6 0 0 0-11.7 1.62A4 4 0 0 0 7 19h10.5z"/><path d="m9 15 2 2 4-4"/></svg>
+        <span id="sync-label">Synced with /Receipts/Claims.xlsx</span>
+        <button class="refresh" id="btn-refresh">Refresh</button>
+      </div>
+      <div id="history"></div>
+    </section>
+   </div>
   </main>
 
   <div class="submitbar" id="submitbar">
@@ -437,6 +485,30 @@
     <button class="btn-danger-ghost" id="btn-remove">Remove</button>
     <button class="btn btn-primary" id="btn-confirm">Confirm details</button>
   </div>
+</div>
+
+<!-- purge confirmation sheet -->
+<div class="sheet" id="purge-sheet" role="dialog" aria-modal="true" aria-label="Erase all scanned data">
+  <div class="grab"></div>
+  <div class="sheet-head">
+    <div class="t">
+      <h2>Erase all scanned data</h2>
+      <p id="purge-desc"></p>
+    </div>
+  </div>
+  <div class="warn-strip">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+    <span>Deleted OneDrive items land in the OneDrive recycle bin, where they can be restored for a limited time. Data on this phone is removed immediately.</span>
+  </div>
+  <div class="field">
+    <label for="purge-confirm">Type ERASE to enable the button</label>
+    <input class="input mono" id="purge-confirm" autocomplete="off" autocapitalize="characters" spellcheck="false">
+  </div>
+  <div class="sheet-actions">
+    <button class="btn btn-outline" id="btn-purge-cancel">Cancel</button>
+    <button class="btn btn-danger" id="btn-purge-run" disabled>Erase everything</button>
+  </div>
+  <div class="setup-status" id="purge-status"></div>
 </div>
 
 <!-- submit progress overlay -->
@@ -574,7 +646,6 @@
     $('#s-clientid').value = S.get('clientId','');
     $('#s-tenantid').value = S.get('tenantId','');
     $('#s-apikey').value = S.get('apiKey','');
-    $('#s-model').value = S.get('model','claude-haiku-4-5-20251001');
     $('#s-base').value = S.get('base','/Receipts');
     const raw = S.get('labels', DEFAULT_LABELS);
     $('#s-labels').value = (Array.isArray(raw)?raw:DEFAULT_LABELS).join(', ');
@@ -589,8 +660,56 @@
   bindSetting('#s-clientid','clientId');
   bindSetting('#s-tenantid','tenantId');
   bindSetting('#s-apikey','apiKey');
-  bindSetting('#s-model','model');
   bindSetting('#s-base','base');
+
+  /* ---------- custom select (shadcn-style) ---------- */
+  function makeSelect(el, cfg){
+    const hasSearch = cfg.options.length >= 8;
+    let value = cfg.value, q = '';
+    el.classList.add('sel');
+    el.innerHTML = '<button type="button" class="sel-trigger"><span class="sel-lab"></span>'
+      +'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>'
+      +'<div class="sel-pop">'+(hasSearch?'<input class="sel-search" placeholder="Search…">':'')+'<div class="sel-list"></div></div>';
+    const trig = el.querySelector('.sel-trigger');
+    const lab = el.querySelector('.sel-lab');
+    const list = el.querySelector('.sel-list');
+    const search = el.querySelector('.sel-search');
+    function updateLab(){
+      const o = cfg.options.find(o=>o.value===value);
+      lab.textContent = o ? o.label : 'Select…';
+    }
+    function updateList(){
+      const shown = q ? cfg.options.filter(o=>(o.label+' '+(o.desc||'')).toLowerCase().includes(q.toLowerCase())) : cfg.options;
+      list.innerHTML = shown.length ? shown.map(o=>
+        '<button type="button" class="sel-opt" data-v="'+esc(o.value)+'"><span>'+esc(o.label)
+        +(o.desc?'<span class="d">'+esc(o.desc)+'</span>':'')+'</span>'
+        +(o.value===value?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>':'')
+        +'</button>').join('') : '<div class="sel-empty">No matches</div>';
+      list.querySelectorAll('.sel-opt').forEach(b=>b.addEventListener('click', ()=>{
+        value = b.dataset.v; q = ''; if(search) search.value = '';
+        el.classList.remove('open'); updateLab(); updateList(); cfg.onChange(value);
+      }));
+    }
+    trig.addEventListener('click', ()=>{
+      el.classList.toggle('open');
+      if(el.classList.contains('open') && search) search.focus();
+    });
+    if(search) search.addEventListener('input', e=>{ q = e.target.value; updateList(); });
+    document.addEventListener('click', e=>{ if(!el.contains(e.target)) el.classList.remove('open'); });
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') el.classList.remove('open'); });
+    updateLab(); updateList();
+    return { set(v){ value = v; updateLab(); updateList(); } };
+  }
+
+  const MODEL_OPTIONS = [
+    {value:'claude-sonnet-4-6', label:'Claude Sonnet 4.6', desc:'Recommended — reliable dates and faded receipts'},
+    {value:'claude-haiku-4-5-20251001', label:'Claude Haiku 4.5', desc:'Cheaper per scan, weaker on dates'}
+  ];
+  makeSelect($('#sel-model'), {
+    options: MODEL_OPTIONS,
+    value: S.get('model','claude-sonnet-4-6'),
+    onChange: v=>S.set('model', v)
+  });
   $('#s-labels').addEventListener('change', e=>{
     const list = e.target.value.split(',').map(s=>s.trim()).filter(s=>s && s.toLowerCase()!=='others');
     S.set('labels', list.length?list:DEFAULT_LABELS);
@@ -760,7 +879,7 @@
         'anthropic-dangerous-direct-browser-access':'true'
       },
       body: JSON.stringify({
-        model: S.get('model','claude-haiku-4-5-20251001'),
+        model: S.get('model','claude-sonnet-4-6'),
         max_tokens: 400,
         messages:[{role:'user', content:[
           {type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64}},
@@ -909,7 +1028,7 @@
     $('#sheet').classList.remove('show');
     activeId = null;
   }
-  $('#scrim').addEventListener('click', closeSheet);
+  $('#scrim').addEventListener('click', ()=>{ closeSheet(); closePurge(); });
   $('#btn-photo-toggle').addEventListener('click', ()=>{
     const p = $('#full-photo');
     p.classList.toggle('show');
@@ -1217,13 +1336,78 @@
   $('#main').addEventListener('scroll', e=>{
     $('#topbar').classList.toggle('scrolled', e.target.scrollTop > 4);
   });
+  document.querySelector('.pane-main').addEventListener('scroll', e=>{
+    $('#topbar').classList.toggle('scrolled', e.target.scrollTop > 4);
+  });
+
+  /* =============== purge / reset =============== */
+  function closePurge(){
+    $('#purge-sheet').classList.remove('show');
+    if(!$('#sheet').classList.contains('show')) $('#scrim').classList.remove('show');
+  }
+  $('#btn-purge-open').addEventListener('click', ()=>{
+    $('#purge-desc').textContent = account
+      ? 'This deletes the entire '+basePath()+' folder in your OneDrive (all receipt PDFs and '+WB_NAME+'), the history cache on this phone, and any receipts in the batch tray. Sign-in, API key and labels are kept.'
+      : 'You are not signed in to Microsoft 365, so this clears data on this phone only (history cache and batch tray). Files in OneDrive stay untouched.';
+    $('#purge-confirm').value = '';
+    $('#btn-purge-run').disabled = true;
+    $('#purge-status').textContent = '';
+    $('#purge-status').className = 'setup-status';
+    $('#scrim').classList.add('show');
+    $('#purge-sheet').classList.add('show');
+  });
+  $('#btn-purge-cancel').addEventListener('click', closePurge);
+  $('#purge-confirm').addEventListener('input', e=>{
+    $('#btn-purge-run').disabled = e.target.value.trim().toUpperCase() !== 'ERASE';
+  });
+  $('#btn-purge-run').addEventListener('click', async ()=>{
+    if($('#purge-confirm').value.trim().toUpperCase() !== 'ERASE') return;
+    const st = $('#purge-status');
+    st.className = 'setup-status'; st.textContent = 'Erasing…';
+    $('#btn-purge-run').disabled = true;
+    try{
+      if(account){
+        const res = await graph('/me/drive/root:'+encPath(basePath()), {method:'DELETE'});
+        if(!res.ok && res.status!==404) throw new Error('Could not delete '+basePath()+' ('+res.status+')');
+      }
+      historyRows = [];
+      S.set('historyCache', []);
+      tray = [];
+      renderTray(); renderHistory(); renderMonthChart();
+      st.className = 'setup-status ok';
+      st.textContent = 'Done. The folder and workbook will be recreated automatically on your next batch.';
+      setTimeout(closePurge, 1800);
+      toast('All scanned data erased');
+    }catch(e){
+      st.className = 'setup-status bad';
+      st.textContent = e.message;
+      $('#btn-purge-run').disabled = false;
+    }
+  });
+
+  /* =============== wide / foldable handling =============== */
+  const wideMQ = window.matchMedia('(min-width:700px)');
+  function handleWide(){
+    if(wideMQ.matches){
+      const active = document.querySelector('.tab.active');
+      if(active && active.dataset.tab==='history'){
+        document.querySelector('[data-tab="scan"]').click();
+      }
+    }
+  }
+  if(wideMQ.addEventListener) wideMQ.addEventListener('change', handleWide);
+  else wideMQ.addListener(handleWide);
 
   /* =============== boot =============== */
+  if(S.get('model','')==='claude-haiku-4-5-20251001' && !S.get('migSonnet',false)){
+    S.set('model','claude-sonnet-4-6'); S.set('migSonnet',true);
+  }
   loadSettings();
   renderHistory();
   renderMonthChart();
   renderTray();
   renderBanner();
+  handleWide();
   initAuth();
 
   if('serviceWorker' in navigator && location.protocol==='https:'){
