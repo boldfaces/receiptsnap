@@ -111,6 +111,10 @@
   .purpose-badge{font-size:11px;font-weight:500;color:var(--muted);background:#f4f4f5;border:1px solid var(--border);border-radius:5px;padding:1px 6px}
   .empty-tray{text-align:center;padding:26px 16px;color:var(--muted-2);font-size:13px}
 
+  .receipt-card.remote{cursor:default;background:#fcfcfc}
+  .receipt-card.remote:hover{border-color:var(--border)}
+  .thumb-ph{width:46px;height:60px;flex:none;border-radius:6px;border:1px dashed var(--border-strong);background:#fafafa;display:flex;align-items:center;justify-content:center;color:var(--muted-2)}
+
   .month-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px;margin-top:26px}
   .mc-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
   .mc-head h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
@@ -348,6 +352,12 @@
       <div id="tray"></div>
       <div class="empty-tray" id="empty-tray">No receipts yet. Captured receipts appear here for review.</div>
 
+      <div class="tray-head" id="remote-head" style="display:none">
+        <h3>On other devices</h3>
+        <div class="count" id="remote-count"></div>
+      </div>
+      <div id="remote-list"></div>
+
       <div class="month-card">
         <div class="mc-head">
           <h3>Filed this month</h3>
@@ -419,6 +429,11 @@
             <input class="input mono" id="s-base" type="text" value="/Receipts" spellcheck="false">
             <div class="help">PDFs are saved into monthly subfolders, e.g. /Receipts/2026-07/. Claims.xlsx sits in the base folder. Change only before your first batch.</div>
           </div>
+          <div class="field">
+            <label for="s-device">Device name</label>
+            <input class="input" id="s-device" type="text" spellcheck="false">
+            <div class="help">Shown on other devices next to receipts scanned here, e.g. "Alexander's phone".</div>
+          </div>
         </div>
       </div>
 
@@ -442,7 +457,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.3</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.4</span></div>
         </div>
       </div>
     </section>
@@ -656,8 +671,8 @@
       }catch(e){ res(false); }
     });
   }
-  function saveItem(r){ if(!idb.db) return; try{ idb.db.transaction('items','readwrite').objectStore('items').put(r); }catch(e){} }
-  function deleteItem(id){ if(!idb.db) return; try{ idb.db.transaction('items','readwrite').objectStore('items').delete(id); }catch(e){} }
+  function saveItem(r){ if(idb.db){ try{ idb.db.transaction('items','readwrite').objectStore('items').put(r); }catch(e){} } schedulePush(); }
+  function deleteItem(id){ if(idb.db){ try{ idb.db.transaction('items','readwrite').objectStore('items').delete(id); }catch(e){} } schedulePush(); }
   function clearItems(){ if(!idb.db) return; try{ idb.db.transaction('items','readwrite').objectStore('items').clear(); }catch(e){} }
   function loadItems(){
     return new Promise(res=>{
@@ -672,6 +687,15 @@
 
   const sync = {running:false, total:0, done:0, error:''};
   const isOnline = ()=>navigator.onLine !== false;
+
+  function deviceId(){
+    let id = S.get('deviceId','');
+    if(!id){ id = Math.random().toString(36).slice(2,10); S.set('deviceId', id); }
+    return id;
+  }
+  function deviceName(){ return S.get('deviceName','') || 'Device '+deviceId().slice(0,4).toUpperCase(); }
+  let pushTimer = null;
+  function schedulePush(){ clearTimeout(pushTimer); pushTimer = setTimeout(()=>pushSync(), 2000); }
 
   /* =============== MSAL / auth =============== */
   let msalApp = null, account = null;
@@ -708,7 +732,7 @@
     }
     renderAccount();
     renderBanner();
-    if(account){ loadHistory(true); }
+    if(account){ loadHistory(true); pushSync(); pollSync(); }
   }
 
   async function getToken(){
@@ -741,6 +765,7 @@
     $('#s-tenantid').value = S.get('tenantId','');
     $('#s-apikey').value = S.get('apiKey','');
     $('#s-base').value = S.get('base','/Receipts');
+    $('#s-device').value = deviceName();
     const raw = S.get('labels', DEFAULT_LABELS);
     $('#s-labels').value = (Array.isArray(raw)?raw:DEFAULT_LABELS).join(', ');
   }
@@ -755,6 +780,8 @@
   bindSetting('#s-tenantid','tenantId');
   bindSetting('#s-apikey','apiKey');
   bindSetting('#s-base','base');
+  bindSetting('#s-device','deviceName');
+  $('#s-device').addEventListener('change', ()=>schedulePush());
 
   /* ---------- custom select (shadcn-style) ---------- */
   function makeSelect(el, cfg){
@@ -1010,6 +1037,7 @@
   async function addReceiptFromDataUrl(raw){
     const r = {
       id: nextId++,
+      uid: Math.random().toString(36).slice(2,8),
       merchant:'', amount:null, dateISO: todayISO(),
       purpose:null, other:'',
       flag:false, flagReason:'',
@@ -1572,7 +1600,8 @@
     if(onStep) onStep(0);
     const pdfBlob = await makePdf(r);
     if(onStep) onStep(1);
-    const fname = r.dateISO+'_'+sanitizeName(r.merchant)+'_RM'+r.amount.toFixed(2)+'.pdf';
+    if(!r.uid){ r.uid = Math.random().toString(36).slice(2,8); saveItem(r); }
+    const fname = r.dateISO+'_'+sanitizeName(r.merchant)+'_RM'+r.amount.toFixed(2)+'_'+r.uid+'.pdf';
     const ym = r.dateISO.slice(0,7);
     const uploaded = await uploadPdf(pdfBlob, basePath()+'/'+ym+'/'+fname);
     if(onStep) onStep(2);
@@ -1874,6 +1903,113 @@
     }
   }
 
+  /* =============== cross-device sync (Tier 1: OneDrive-backed) =============== */
+  const SYNC_DIR = '.sync';
+  const REMOTE_TTL = 72*3600*1000;
+  const remote = {devices:{}, fileMeta:{}, wbStamp:''};
+
+  async function pushSync(){
+    if(!account || !isOnline()) return;
+    const payload = {
+      device: deviceId(),
+      name: deviceName(),
+      updatedAt: new Date().toISOString(),
+      items: tray.map(r=>({
+        uid: r.uid, merchant: r.merchant, amount: r.amount, dateISO: r.dateISO,
+        purpose: r.purpose==='Others' ? r.other : r.purpose,
+        status: r.status, thumb: r.thumbUrl || null
+      }))
+    };
+    try{
+      await graph('/me/drive/root:'+encPath(basePath()+'/'+SYNC_DIR+'/device-'+deviceId()+'.json')+':/content', {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+    }catch(e){}
+  }
+
+  async function pollSync(){
+    if(!account || !isOnline() || document.hidden) return;
+    try{
+      const res = await graph('/me/drive/root:'+encPath(basePath()+'/'+SYNC_DIR)+':/children?$select=name,lastModifiedDateTime');
+      if(res.ok){
+        const kids = ((await res.json()).value)||[];
+        const seen = {};
+        for(const k of kids){
+          if(!/^device-.+\.json$/.test(k.name)) continue;
+          if(k.name === 'device-'+deviceId()+'.json') continue;
+          seen[k.name] = true;
+          if(remote.fileMeta[k.name] !== k.lastModifiedDateTime){
+            const fr = await graph('/me/drive/root:'+encPath(basePath()+'/'+SYNC_DIR+'/'+k.name)+':/content');
+            if(fr.ok){
+              try{
+                remote.devices[k.name] = await fr.json();
+                remote.fileMeta[k.name] = k.lastModifiedDateTime;
+              }catch(e){}
+            }
+          }
+        }
+        Object.keys(remote.devices).forEach(n=>{ if(!seen[n]){ delete remote.devices[n]; delete remote.fileMeta[n]; } });
+        renderRemote();
+      }else if(res.status===404){
+        remote.devices = {}; remote.fileMeta = {};
+        renderRemote();
+      }
+      // Refresh history only when the workbook actually changed (cheap metadata check)
+      const wb = await graph('/me/drive/root:'+encPath(basePath()+'/'+WB_NAME)+'?select=lastModifiedDateTime');
+      if(wb.ok){
+        const stamp = ((await wb.json()).lastModifiedDateTime)||'';
+        if(stamp && remote.wbStamp && stamp !== remote.wbStamp) loadHistory(true);
+        remote.wbStamp = stamp;
+      }
+    }catch(e){}
+  }
+
+  function relTime(iso){
+    const mins = Math.max(0, Math.round((Date.now() - Date.parse(iso))/60000));
+    if(mins < 1) return 'just now';
+    if(mins < 60) return mins+'m ago';
+    const h = Math.round(mins/60);
+    if(h < 24) return h+'h ago';
+    return Math.round(h/24)+'d ago';
+  }
+
+  const REMOTE_PILL = {
+    'reading':'<span class="pill pill-reading"><span class="dot"></span>Reading</span>',
+    'pending-read':'<span class="pill pill-sync"><span class="dot"></span>Waiting</span>',
+    'queued':'<span class="pill pill-sync"><span class="dot"></span>Queued</span>',
+    'warn':'<span class="pill pill-warn"><span class="dot"></span>Being checked</span>',
+    'ready':'<span class="pill pill-ready"><span class="dot"></span>Ready</span>',
+    'review':'<span class="pill pill-review"><span class="dot"></span>In review</span>'
+  };
+  const PH_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v19l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21V2z"/><path d="M9 7h6M9 11h6M9 15h3"/></svg>';
+
+  function renderRemote(){
+    const now = Date.now();
+    const rows = [];
+    Object.values(remote.devices).forEach(d=>{
+      if(!d || !d.updatedAt || (now - Date.parse(d.updatedAt)) > REMOTE_TTL) return;
+      (d.items||[]).forEach(it=>rows.push({d, it}));
+    });
+    $('#remote-head').style.display = rows.length ? 'flex' : 'none';
+    $('#remote-count').textContent = rows.length ? rows.length+(rows.length===1?' receipt':' receipts') : '';
+    $('#remote-list').innerHTML = rows.map(({d, it})=>{
+      const thumb = it.thumb
+        ? '<span class="thumb"><img src="'+it.thumb+'" alt=""></span>'
+        : '<span class="thumb-ph">'+PH_SVG+'</span>';
+      const pill = REMOTE_PILL[it.status] || REMOTE_PILL.review;
+      const purpose = it.purpose ? '<span class="purpose-badge">'+esc(it.purpose)+'</span>' : '';
+      return '<div class="receipt-card remote">'
+        + thumb
+        +'<span class="info">'
+          +'<span class="merchant">'+esc(it.merchant||'Receipt')+'</span>'
+          +'<span class="meta">'+pill+purpose+'<span class="purpose-badge">'+esc(d.name||'Other device')+' · '+relTime(d.updatedAt)+'</span></span>'
+        +'</span>'
+        +'<span class="amount"><span class="cur">RM</span>'+(it.amount ? fmt(it.amount) : '—')+'</span>'
+      +'</div>';
+    }).join('');
+  }
+
   /* =============== purge / reset =============== */
   function closePurge(){
     $('#purge-sheet').classList.remove('show');
@@ -1955,9 +2091,11 @@
     renderSyncBanner();
     handleWide();
     initAuth();
-    window.addEventListener('online', ()=>{ renderConn(); renderTray(); syncQueues(); });
+    window.addEventListener('online', ()=>{ renderConn(); renderTray(); syncQueues(); pollSync(); });
     window.addEventListener('offline', ()=>{ renderConn(); renderTray(); });
     if(isOnline()) setTimeout(syncQueues, 1200);
+    setInterval(pollSync, 15000);
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ pollSync(); syncQueues(); } });
 
     if('serviceWorker' in navigator && location.protocol==='https:'){
       navigator.serviceWorker.register('sw.js').catch(()=>{});
