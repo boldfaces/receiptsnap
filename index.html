@@ -296,12 +296,31 @@
   .full-photos.show{display:block}
   .full-photos img{width:100%;border-radius:var(--r-md);border:1px solid var(--border);display:block;margin-bottom:8px}
 
+  /* ---------- boot splash ---------- */
+  .boot{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .35s}
+  .boot.done{opacity:0;pointer-events:none}
+  .boot-mark{width:64px;height:64px;border-radius:18px;background:var(--fg);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:var(--shadow-lg)}
+  .boot-name{margin-top:14px;font-size:15px;font-weight:700;letter-spacing:-.01em}
+  .boot-status{margin-top:24px;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);min-height:16px;transition:opacity .18s}
+  .boot-status .spin{border-color:var(--border-strong);border-top-color:var(--muted)}
+
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
   }
 </style>
 </head>
 <body>
+
+<div class="boot" id="boot">
+  <div class="boot-mark">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v19l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21V2z"/><path d="M9 7h6M9 11h6M9 15h3"/></svg>
+  </div>
+  <div class="boot-name">ReceiptSnap</div>
+  <div class="boot-status" id="boot-status">
+    <span class="spin"></span>
+    <span id="boot-status-text">Starting…</span>
+  </div>
+</div>
 
 <div class="phone">
 
@@ -457,7 +476,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.4.1</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.6</span></div>
         </div>
       </div>
     </section>
@@ -732,7 +751,11 @@
     }
     renderAccount();
     renderBanner();
-    if(account){ loadHistory(true); pushSync(); pollSync(); }
+    if(account){
+      bootMsg('Loading claims history…');
+      await loadHistory(true);
+      pushSync(); pollSync();
+    }
   }
 
   async function getToken(){
@@ -1748,7 +1771,12 @@
       renderMonthChart();
     }
   }
-  $('#btn-refresh').addEventListener('click', ()=>loadHistory(false));
+  $('#btn-refresh').addEventListener('click', async ()=>{
+    const b = $('#btn-refresh');
+    b.textContent = 'Refreshing…'; b.disabled = true;
+    await loadHistory(false);
+    b.textContent = 'Refresh'; b.disabled = false;
+  });
 
   function monthKeyOf(dateStr){
     const m = /^(\d{4})-(\d{2})/.exec(String(dateStr));
@@ -2086,11 +2114,46 @@
   if(wideMQ.addEventListener) wideMQ.addEventListener('change', handleWide);
   else wideMQ.addListener(handleWide);
 
+  /* =============== boot splash control =============== */
+  const bootStart = performance.now();
+  let bootHidden = false, slowTimer = null, bootFailsafe = null;
+  const SLOW_MSGS = ['Still working — the connection is a bit slow…', 'Hang tight, almost there…', 'Waking up OneDrive…'];
+
+  function bootMsg(t){
+    if(bootHidden) return;
+    const el = document.getElementById('boot-status-text');
+    const wrap = document.getElementById('boot-status');
+    if(!el || !wrap || el.textContent === t) return;
+    wrap.style.opacity = '0';
+    setTimeout(()=>{ el.textContent = t; wrap.style.opacity = '1'; }, 180);
+  }
+
+  function hideSplash(){
+    if(bootHidden) return;
+    bootHidden = true;
+    clearInterval(slowTimer); clearTimeout(bootFailsafe);
+    const b = document.getElementById('boot');
+    if(!b) return;
+    const wait = Math.max(0, 350 - (performance.now() - bootStart));
+    setTimeout(()=>{ b.classList.add('done'); setTimeout(()=>b.remove(), 400); }, wait);
+  }
+
   /* =============== boot =============== */
   if(S.get('model','')==='claude-haiku-4-5-20251001' && !S.get('migSonnet',false)){
     S.set('model','claude-sonnet-4-6'); S.set('migSonnet',true);
   }
   (async ()=>{
+    let si = 0;
+    slowTimer = setInterval(()=>{
+      if(performance.now() - bootStart > 3500) bootMsg(SLOW_MSGS[si++ % SLOW_MSGS.length]);
+    }, 3200);
+    bootFailsafe = setTimeout(hideSplash, 8000);
+    if(sessionStorage.getItem('rs.updating')){
+      sessionStorage.removeItem('rs.updating');
+      bootMsg('Updating to the latest version…');
+      await sleep(500);
+    }
+    bootMsg('Restoring your receipts…');
     await idbOpen();
     const saved = await loadItems();
     if(saved.length){
@@ -2107,7 +2170,9 @@
     renderConn();
     renderSyncBanner();
     handleWide();
-    initAuth();
+    bootMsg('Connecting to Microsoft 365…');
+    await initAuth();
+    hideSplash();
     window.addEventListener('online', ()=>{ renderConn(); renderTray(); syncQueues(); pollSync(); });
     window.addEventListener('offline', ()=>{ renderConn(); renderTray(); });
     if(isOnline()) setTimeout(syncQueues, 1200);
@@ -2115,7 +2180,19 @@
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ pollSync(); syncQueues(); } });
 
     if('serviceWorker' in navigator && location.protocol==='https:'){
-      navigator.serviceWorker.register('sw.js').catch(()=>{});
+      navigator.serviceWorker.register('sw.js').then(reg=>{
+        reg.update().catch(()=>{});
+        document.addEventListener('visibilitychange', ()=>{
+          if(!document.hidden) reg.update().catch(()=>{});
+        });
+      }).catch(()=>{});
+      let reloadedForUpdate = false;
+      navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+        if(reloadedForUpdate) return;
+        reloadedForUpdate = true;
+        try{ sessionStorage.setItem('rs.updating','1'); }catch(e){}
+        location.reload();
+      });
     }
   })();
 })();
