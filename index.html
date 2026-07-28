@@ -457,7 +457,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.4</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.4.1</span></div>
         </div>
       </div>
     </section>
@@ -1713,6 +1713,16 @@
     renderMonthChart();
   }
 
+  function excelSerialToISO(n){
+    // serial 25569 = 1970-01-01; computed in UTC to avoid timezone drift
+    return new Date(Math.round((n - 25569) * 86400000)).toISOString().slice(0,10);
+  }
+  function rowDateISO(v){
+    if(typeof v === 'number' && v > 20000 && v < 80000) return excelSerialToISO(v);
+    const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v||''));
+    return m ? m[1] : null;
+  }
+
   async function loadHistory(silent){
     if(!account) { renderHistory(); renderMonthChart(); return; }
     try{
@@ -1720,7 +1730,14 @@
       if(res.status===404){ renderHistory(); renderMonthChart(); return; }
       if(!res.ok) throw new Error('Could not load history ('+res.status+')');
       const data = await res.json();
-      historyRows = (data.value||[]).map(row=>row.values[0]).filter(r=>Array.isArray(r) && r.some(c=>c!==null && c!==''));
+      historyRows = (data.value||[])
+        .map(row=>row.values[0])
+        .filter(r=>Array.isArray(r) && r.some(c=>c!==null && c!==''))
+        .map(row=>{
+          const iso = rowDateISO(row[0]);
+          if(iso) row[0] = iso;
+          return row;
+        });
       S.set('historyCache', historyRows);
       renderHistory();
       renderMonthChart();

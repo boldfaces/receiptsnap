@@ -1,4 +1,4 @@
-const CACHE = 'receiptsnap-v8';
+const CACHE = 'receiptsnap-v9';
 const LIBS = 'receiptsnap-libs';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 const LIB_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'alcdn.msauth.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
