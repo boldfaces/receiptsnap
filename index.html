@@ -287,8 +287,19 @@
   .cam-progress.show{display:block}
   #cam-progress-fill{display:block;height:100%;width:0%;background:#fff;border-radius:999px;transition:width .2s}
   .cam-actions{display:flex;align-items:center;justify-content:center;gap:26px}
-  .cam-shutter{width:68px;height:68px;border-radius:999px;background:#fff;border:5px solid rgba(255,255,255,.35);background-clip:padding-box;transition:transform .1s}
+  .cam-shutter{width:68px;height:68px;border-radius:999px;background:#fff;border:5px solid rgba(255,255,255,.35);background-clip:padding-box;transition:transform .1s,border-color .2s,opacity .2s}
   .cam-shutter:active{transform:scale(.94)}
+  .cam-shutter.locked{border-color:rgba(52,211,153,.85)}
+  .cam-shutter.disarmed{opacity:.45}
+  .cam-shutter.dupe{border-color:rgba(251,191,36,.9)}
+  .cam-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5}
+  .cam-flash.go{animation:camflash .18s ease-out}
+  @keyframes camflash{0%{opacity:.85}100%{opacity:0}}
+  .cam-strip{display:flex;gap:6px;justify-content:center;align-items:flex-end;margin-bottom:10px;overflow-x:auto;padding:2px;scrollbar-width:none}
+  .cam-strip::-webkit-scrollbar{display:none}
+  .cam-strip img{width:32px;height:42px;object-fit:cover;border-radius:5px;border:1.5px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.4);flex:none}
+  .cam-strip img.pop{animation:strippop .3s ease}
+  @keyframes strippop{0%{transform:scale(.4)}70%{transform:scale(1.12)}100%{transform:scale(1)}}
   .cam-side{color:#fff;font-size:12px;font-weight:600;background:rgba(24,24,27,.55);border-radius:10px;padding:10px 12px;line-height:1.25;min-width:76px;backdrop-filter:blur(6px)}
   .cam-side.on{background:#fff;color:#18181b}
   .cam-count{color:rgba(255,255,255,.85);font-size:12px;margin-top:12px;font-weight:500;min-height:15px}
@@ -476,7 +487,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.6</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.7</span></div>
         </div>
       </div>
     </section>
@@ -522,6 +533,7 @@
 <div class="camview" id="camview">
   <video id="cam-video" playsinline autoplay muted></video>
   <canvas id="cam-overlay"></canvas>
+  <div class="cam-flash" id="cam-flash"></div>
   <div class="cam-top">
     <button class="cam-icon" id="cam-close" aria-label="Close camera">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -531,6 +543,7 @@
     </button>
   </div>
   <div class="cam-bottom">
+    <div class="cam-strip" id="cam-strip"></div>
     <div class="cam-status" id="cam-status">Point the camera at a receipt</div>
     <div class="cam-progress" id="cam-progress"><span id="cam-progress-fill"></span></div>
     <div class="cam-actions">
@@ -1177,7 +1190,58 @@
   }
   const cvOk = ()=> typeof window.cv !== 'undefined' && !!window.cv.Mat;
 
-  const cam = {running:false, stream:null, raf:0, lastT:0, stable:0, lastQuad:null, appendToLast:false, track:null, torchOn:false, busy:false};
+  const cam = {running:false, stream:null, raf:0, lastT:0, stable:0, lastQuad:null, prevQuad:null, quadHist:[], appendToLast:false, track:null, torchOn:false, busy:false, armed:true, clearFrames:0, dupeHold:false, sessionHashes:[], pendingHash:null};
+
+  function setShutter(state){
+    $('#cam-shutter').className = 'cam-shutter' + (state && state!=='idle' ? ' '+state : '');
+  }
+  function flashScreen(){
+    const f = $('#cam-flash');
+    f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+  }
+  function seedStrip(){
+    $('#cam-strip').innerHTML = tray.map(r=>r.thumbUrl?'<img src="'+r.thumbUrl+'" alt="">':'').join('');
+  }
+  function addStripThumb(url){
+    const s = $('#cam-strip');
+    const img = document.createElement('img');
+    img.src = url; img.className = 'pop';
+    s.appendChild(img);
+    s.scrollLeft = s.scrollWidth;
+  }
+
+  /* perceptual fingerprint (8x8 luminance hash) for duplicate detection */
+  function bitsFromPixels(d){
+    const lum = []; let sum = 0;
+    for(let i=0;i<64;i++){ const l = (d[i*4]*3 + d[i*4+1]*4 + d[i*4+2])>>3; lum.push(l); sum += l; }
+    const avg = sum/64;
+    return lum.map(l=>l>avg?1:0);
+  }
+  function hashFromCanvasRegion(src, bx, by, bw, bh){
+    try{
+      const c = document.createElement('canvas'); c.width = 8; c.height = 8;
+      const x = c.getContext('2d');
+      x.drawImage(src, bx, by, bw, bh, 0, 0, 8, 8);
+      return bitsFromPixels(x.getImageData(0,0,8,8).data);
+    }catch(e){ return null; }
+  }
+  function hashFromDataUrl(url){
+    return new Promise(res=>{
+      const img = new Image();
+      img.onload = ()=>{
+        try{
+          const c = document.createElement('canvas'); c.width = 8; c.height = 8;
+          const x = c.getContext('2d');
+          x.drawImage(img, 0, 0, 8, 8);
+          res(bitsFromPixels(x.getImageData(0,0,8,8).data));
+        }catch(e){ res(null); }
+      };
+      img.onerror = ()=>res(null);
+      img.src = url;
+    });
+  }
+  function hamming(a,b){ let d=0; for(let i=0;i<64;i++) if(a[i]!==b[i]) d++; return d; }
+  function isDupeHash(h){ return !!h && cam.sessionHashes.some(x=>x && hamming(x,h)<=10); }
   const camStatus = t => { $('#cam-status').textContent = t; };
   const updateCamCount = ()=>{ $('#cam-count').textContent = tray.length ? tray.length+(tray.length===1?' receipt':' receipts')+' in batch' : ''; };
 
@@ -1220,7 +1284,12 @@
       bar.classList.remove('show');
     }
     cam.running = true; cam.busy = false;
-    cam.stable = 0; cam.lastQuad = null; cam.lastT = 0;
+    cam.stable = 0; cam.lastQuad = null; cam.prevQuad = null; cam.quadHist = []; cam.lastT = 0;
+    cam.armed = true; cam.clearFrames = 0; cam.dupeHold = false;
+    cam.sessionHashes = []; cam.pendingHash = null;
+    seedStrip();
+    tray.forEach(r=>{ if(r.thumbUrl) hashFromDataUrl(r.thumbUrl).then(h=>{ if(h) cam.sessionHashes.push(h); }); });
+    setShutter('idle');
     if(cvOk()) camStatus('Point the camera at a receipt');
     camLoop();
   }
@@ -1254,6 +1323,19 @@
 
   $('#cam-shutter').addEventListener('click', ()=>{ if(cam.running && !cam.busy) captureFrame(cam.lastQuad); });
 
+  function smoothQuad(raw){
+    if(!raw){ cam.quadHist = []; return null; }
+    cam.quadHist.push(raw);
+    if(cam.quadHist.length > 3) cam.quadHist.shift();
+    const n = cam.quadHist.length, out = {};
+    ['tl','tr','br','bl'].forEach(k=>{
+      let x=0, y=0;
+      cam.quadHist.forEach(h=>{ x+=h[k].x; y+=h[k].y; });
+      out[k] = {x:x/n, y:y/n};
+    });
+    return out;
+  }
+
   function camLoop(){
     if(!cam.running) return;
     cam.raf = requestAnimationFrame(camLoop);
@@ -1262,63 +1344,142 @@
     cam.lastT = now;
     const v = $('#cam-video');
     if(!v.videoWidth) return;
-    if(!cvOk()){ drawOverlay(null,false); return; }
+    if(!cvOk()){ drawOverlay(null,'search'); return; }
     const detH = Math.round(DET_W * v.videoHeight / v.videoWidth);
     const c = document.createElement('canvas');
     c.width = DET_W; c.height = detH;
     const ctx = c.getContext('2d', {willReadFrequently:true});
     ctx.drawImage(v, 0, 0, DET_W, detH);
-    let quad = null;
-    try{ quad = detectQuad(ctx.getImageData(0,0,DET_W,detH), DET_W, detH); }catch(e){ quad = null; }
-    if(quad && cam.lastQuad){
-      const move = ['tl','tr','br','bl'].reduce((s,k)=>s+Math.hypot(quad[k].x-cam.lastQuad[k].x, quad[k].y-cam.lastQuad[k].y), 0);
+    let raw = null;
+    try{ raw = detectQuad(ctx.getImageData(0,0,DET_W,detH), DET_W, detH); }catch(e){ raw = null; }
+    const quad = smoothQuad(raw);
+    cam.lastQuad = quad;
+
+    // Disarmed after a capture: stay locked out until the frame clears,
+    // so a stationary receipt can never be captured twice.
+    if(!cam.armed){
+      if(quad){
+        cam.clearFrames = 0;
+        drawOverlay(quad,'disarmed');
+        if(!cam.busy) camStatus('Captured — move it away or point at the next receipt');
+      }else{
+        cam.clearFrames++;
+        drawOverlay(null,'search');
+        if(cam.clearFrames >= 5){
+          cam.armed = true; cam.dupeHold = false;
+          if(!cam.busy) camStatus(cam.appendToLast ? 'Next capture adds a page to the last receipt' : 'Point the camera at a receipt');
+        }
+      }
+      setShutter(cam.armed ? 'idle' : 'disarmed');
+      cam.stable = 0; cam.prevQuad = null;
+      return;
+    }
+
+    // Holding: current receipt fingerprints like one already scanned.
+    if(cam.dupeHold){
+      if(quad){
+        cam.clearFrames = 0;
+        drawOverlay(quad,'dupe');
+        camStatus('Looks like a receipt you already scanned — shutter to capture anyway');
+        setShutter('dupe');
+      }else{
+        cam.clearFrames++;
+        drawOverlay(null,'search');
+        setShutter('idle');
+        if(cam.clearFrames >= 5){ cam.dupeHold = false; camStatus('Point the camera at a receipt'); }
+      }
+      cam.stable = 0; cam.prevQuad = null;
+      return;
+    }
+
+    // Armed: normal stability lock on smoothed corners.
+    if(quad && cam.prevQuad){
+      const move = ['tl','tr','br','bl'].reduce((s,k)=>s+Math.hypot(quad[k].x-cam.prevQuad[k].x, quad[k].y-cam.prevQuad[k].y), 0);
       cam.stable = move < MOVE_TOL*4 ? cam.stable+1 : 0;
     }else{
       cam.stable = 0;
     }
-    cam.lastQuad = quad;
+    cam.prevQuad = quad;
     const stable = cam.stable >= STABLE_N;
-    drawOverlay(quad, stable);
+    drawOverlay(quad, stable ? 'locked' : 'search');
+    setShutter(stable ? 'locked' : 'idle');
     if(!cam.busy){
       if(quad) camStatus(stable ? 'Capturing…' : 'Hold steady…');
       else camStatus(cam.appendToLast ? 'Next capture adds a page to the last receipt' : 'Point the camera at a receipt');
     }
-    if(stable && !cam.busy) captureFrame(quad);
+    if(stable && !cam.busy){
+      const xs = [quad.tl.x, quad.tr.x, quad.br.x, quad.bl.x];
+      const ys = [quad.tl.y, quad.tr.y, quad.br.y, quad.bl.y];
+      const bx = Math.max(0, Math.min.apply(null, xs)), by = Math.max(0, Math.min.apply(null, ys));
+      const bw = Math.max(8, Math.min(DET_W, Math.max.apply(null, xs)) - bx);
+      const bh = Math.max(8, Math.min(detH, Math.max.apply(null, ys)) - by);
+      const h = hashFromCanvasRegion(c, bx, by, bw, bh);
+      if(!cam.appendToLast && isDupeHash(h)){
+        cam.dupeHold = true; cam.stable = 0;
+        return;
+      }
+      cam.pendingHash = h;
+      captureFrame(quad);
+    }
   }
 
   function detectQuad(imgData, W, H){
     const cvm = window.cv;
     const src = cvm.matFromImageData(imgData);
-    const gray = new cvm.Mat(), blur = new cvm.Mat(), edges = new cvm.Mat();
+    const gray = new cvm.Mat(), blur = new cvm.Mat();
     cvm.cvtColor(src, gray, cvm.COLOR_RGBA2GRAY);
     cvm.GaussianBlur(gray, blur, new cvm.Size(5,5), 0);
-    cvm.Canny(blur, edges, 40, 120);
+    // Pass 1: normal sensitivity. Pass 2 (only when pass 1 finds nothing):
+    // high sensitivity for weak edges on bright / low-contrast backgrounds.
+    let best = scanEdges(cvm, blur, W, H, 40, 120);
+    if(!best) best = scanEdges(cvm, blur, W, H, 8, 32);
+    src.delete(); gray.delete(); blur.delete();
+    return best;
+  }
+
+  function scanEdges(cvm, blur, W, H, lo, hi){
+    const edges = new cvm.Mat();
+    cvm.Canny(blur, edges, lo, hi);
     const kernel = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(3,3));
     cvm.dilate(edges, edges, kernel);
     const contours = new cvm.MatVector(), hier = new cvm.Mat();
     cvm.findContours(edges, contours, hier, cvm.RETR_EXTERNAL, cvm.CHAIN_APPROX_SIMPLE);
-    let best = null, bestArea = 0;
+    const okSpan = q => {
+      const xs = q.map(p=>p.x), ys = q.map(p=>p.y);
+      return (Math.max.apply(null,xs)-Math.min.apply(null,xs)) > 0.35*W
+          || (Math.max.apply(null,ys)-Math.min.apply(null,ys)) > 0.45*H;
+    };
+    let best = null, bestArea = 0, fbQuad = null, fbArea = 0;
     for(let i=0; i<contours.size(); i++){
       const cnt = contours.get(i);
       const area = cvm.contourArea(cnt);
-      if(area > 0.07*W*H && area > bestArea){
+      if(area > 0.07*W*H){
         const peri = cvm.arcLength(cnt, true);
         const approx = new cvm.Mat();
         cvm.approxPolyDP(cnt, approx, 0.02*peri, true);
+        const pts = [];
         if(approx.rows === 4 && cvm.isContourConvex(approx)){
-          const pts = [];
           for(let j=0; j<4; j++) pts.push({x:approx.data32S[j*2], y:approx.data32S[j*2+1]});
-          const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
-          const bw = Math.max.apply(null,xs)-Math.min.apply(null,xs);
-          const bh = Math.max.apply(null,ys)-Math.min.apply(null,ys);
-          if(bw > 0.35*W || bh > 0.45*H){ best = orderQuad(pts); bestArea = area; }
+        }
+        if(pts.length === 4 && area > bestArea && okSpan(pts)){
+          best = orderQuad(pts); bestArea = area;
+        }else if(!pts.length && area > fbArea){
+          // Imperfect outline (e.g. a thumb over one edge): fit a rotated
+          // rectangle and accept it if the contour fills most of it.
+          const rr = cvm.minAreaRect(cnt);
+          const rrArea = rr.size.width * rr.size.height;
+          if(rrArea > 0 && area/rrArea > 0.72){
+            const rp = cvm.RotatedRect.points(rr);
+            const q = [0,1,2,3].map(j=>({x:rp[j].x, y:rp[j].y}));
+            if(okSpan(q)){ fbQuad = orderQuad(q); fbArea = area; }
+          }
         }
         approx.delete();
       }
       cnt.delete();
     }
-    src.delete(); gray.delete(); blur.delete(); edges.delete(); kernel.delete(); contours.delete(); hier.delete();
-    return best;
+    edges.delete(); kernel.delete(); contours.delete(); hier.delete();
+    return best || fbQuad;
   }
 
   function orderQuad(pts){
@@ -1333,7 +1494,14 @@
     return {tl:ex(q.tl), tr:ex(q.tr), br:ex(q.br), bl:ex(q.bl)};
   }
 
-  function drawOverlay(quad, stable){
+  const OVERLAY_STYLES = {
+    search:  {fill:'rgba(255,255,255,.10)', stroke:'rgba(255,255,255,.9)'},
+    locked:  {fill:'rgba(52,211,153,.16)',  stroke:'#34d399'},
+    disarmed:{fill:'rgba(255,255,255,.05)', stroke:'rgba(255,255,255,.35)'},
+    dupe:    {fill:'rgba(251,191,36,.15)',  stroke:'#fbbf24'}
+  };
+
+  function drawOverlay(quad, state){
     const cnv = $('#cam-overlay'), v = $('#cam-video');
     const dw = cnv.clientWidth, dh = cnv.clientHeight, dpr = window.devicePixelRatio || 1;
     if(cnv.width !== Math.round(dw*dpr)){ cnv.width = Math.round(dw*dpr); cnv.height = Math.round(dh*dpr); }
@@ -1341,6 +1509,7 @@
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.clearRect(0,0,dw,dh);
     if(!quad || !v.videoWidth) return;
+    const st = OVERLAY_STYLES[state] || OVERLAY_STYLES.search;
     const s = Math.max(dw/v.videoWidth, dh/v.videoHeight);
     const ox = (dw - v.videoWidth*s)/2, oy = (dh - v.videoHeight*s)/2;
     const k = v.videoWidth / DET_W;
@@ -1350,29 +1519,49 @@
     ctx.moveTo(pts[0].x, pts[0].y);
     for(let i=1; i<4; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.closePath();
-    ctx.fillStyle = stable ? 'rgba(52,211,153,.16)' : 'rgba(255,255,255,.10)';
+    ctx.fillStyle = st.fill;
     ctx.fill();
     ctx.lineWidth = 2.5;
-    ctx.strokeStyle = stable ? '#34d399' : 'rgba(255,255,255,.9)';
+    ctx.strokeStyle = st.stroke;
     ctx.stroke();
+  }
+
+  function detectOnStill(fc){
+    try{
+      const W2 = 640, H2 = Math.round(W2 * fc.height / fc.width);
+      const c = document.createElement('canvas');
+      c.width = W2; c.height = H2;
+      const ctx = c.getContext('2d', {willReadFrequently:true});
+      ctx.drawImage(fc, 0, 0, W2, H2);
+      const q = detectQuad(ctx.getImageData(0,0,W2,H2), W2, H2);
+      return q ? {quad:q, k:fc.width/W2} : null;
+    }catch(e){ return null; }
   }
 
   async function captureFrame(quad){
     if(cam.busy) return;
     cam.busy = true;
     camStatus('Captured');
+    flashScreen();
     const v = $('#cam-video');
     const fc = document.createElement('canvas');
     fc.width = v.videoWidth; fc.height = v.videoHeight;
     fc.getContext('2d').drawImage(v, 0, 0);
-    let dataUrl;
-    if(quad && cvOk()){
-      try{ dataUrl = warpFromCanvas(fc, expandQuad(quad, 1.02), v.videoWidth/DET_W); }
-      catch(e){ dataUrl = fc.toDataURL('image/jpeg', 0.87); }
-    }else{
-      dataUrl = fc.toDataURL('image/jpeg', 0.87);
+    let dataUrl = null, k = v.videoWidth/DET_W, useQuad = quad;
+    if(!useQuad && cvOk()){
+      // Manual shutter without a live lock: run the full detector on the
+      // high-resolution still, where more detail is available.
+      const sd = detectOnStill(fc);
+      if(sd){ useQuad = sd.quad; k = sd.k; }
     }
+    if(useQuad && cvOk()){
+      try{ dataUrl = warpFromCanvas(fc, expandQuad(useQuad, 1.02), k); }
+      catch(e){ dataUrl = null; }
+    }
+    if(!dataUrl) dataUrl = fc.toDataURL('image/jpeg', 0.87);
     if(navigator.vibrate) navigator.vibrate(40);
+    if(cam.pendingHash){ cam.sessionHashes.push(cam.pendingHash); cam.pendingHash = null; }
+    else hashFromDataUrl(dataUrl).then(h=>{ if(h) cam.sessionHashes.push(h); });
     if(cam.appendToLast && tray.length){
       cam.appendToLast = false;
       $('#cam-addpage').classList.remove('on');
@@ -1383,14 +1572,13 @@
       reExtract(r);
       toast('Page '+r.pages.length+' added to '+(r.merchant||'last receipt'));
     }else{
-      addReceiptFromDataUrl(dataUrl);
+      addReceiptFromDataUrl(dataUrl).then(r=>{ if(r && r.thumbUrl) addStripThumb(r.thumbUrl); });
     }
     updateCamCount();
-    setTimeout(()=>{
-      cam.busy = false;
-      cam.stable = 0; cam.lastQuad = null;
-      if(cam.running) camStatus('Point the camera at the next receipt');
-    }, 1300);
+    // Disarm: auto-capture stays off until the frame clears (see camLoop).
+    cam.armed = false; cam.clearFrames = 0; cam.dupeHold = false;
+    cam.stable = 0; cam.quadHist = []; cam.prevQuad = null;
+    cam.busy = false;
   }
 
   function warpFromCanvas(canvas, q, k){
