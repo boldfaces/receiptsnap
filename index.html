@@ -300,6 +300,18 @@
   .cam-strip img{width:32px;height:42px;object-fit:cover;border-radius:5px;border:1.5px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.4);flex:none}
   .cam-strip img.pop{animation:strippop .3s ease}
   @keyframes strippop{0%{transform:scale(.4)}70%{transform:scale(1.12)}100%{transform:scale(1)}}
+
+  /* ---------- post-capture crop editor ---------- */
+  .cropview{position:fixed;inset:0;z-index:85;background:#0c0c0d;display:none}
+  .cropview.show{display:block}
+  #crop-canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+  .crop-top{position:absolute;top:0;left:0;right:0;padding:calc(18px + env(safe-area-inset-top)) 20px 0;text-align:center;color:#fff;pointer-events:none}
+  .crop-title{font-weight:700;font-size:15px;letter-spacing:-.01em}
+  .crop-hint{font-size:12px;color:rgba(255,255,255,.65);margin-top:3px}
+  .crop-warn{position:absolute;left:16px;right:16px;bottom:calc(96px + env(safe-area-inset-bottom));background:#b45309;border-radius:10px;padding:11px 14px;color:#fff;font-size:12.5px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+  .crop-bottom{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:14px 16px calc(18px + env(safe-area-inset-bottom));background:linear-gradient(180deg,transparent,rgba(0,0,0,.55))}
+  .crop-btn{flex:1;padding:14px 8px;border-radius:12px;font-weight:600;font-size:13.5px;background:rgba(255,255,255,.16);color:#fff;backdrop-filter:blur(6px)}
+  .crop-btn.primary{background:#fff;color:#18181b;flex:1.5}
   .cam-side{color:#fff;font-size:12px;font-weight:600;background:rgba(24,24,27,.55);border-radius:10px;padding:10px 12px;line-height:1.25;min-width:76px;backdrop-filter:blur(6px)}
   .cam-side.on{background:#fff;color:#18181b}
   .cam-count{color:rgba(255,255,255,.85);font-size:12px;margin-top:12px;font-weight:500;min-height:15px}
@@ -487,7 +499,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.7</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.8</span></div>
         </div>
       </div>
     </section>
@@ -552,6 +564,21 @@
       <button class="cam-side" id="cam-done">Done</button>
     </div>
     <div class="cam-count" id="cam-count"></div>
+  </div>
+</div>
+
+<!-- post-capture crop editor -->
+<div class="cropview" id="cropview">
+  <canvas id="crop-canvas"></canvas>
+  <div class="crop-top">
+    <div class="crop-title">Adjust the crop</div>
+    <div class="crop-hint">Drag the corners to match the receipt</div>
+  </div>
+  <div class="crop-warn" id="crop-warn" style="display:none">Looks like a receipt you already scanned. Tap "Add anyway" if this is a new one.</div>
+  <div class="crop-bottom">
+    <button class="crop-btn" id="crop-retake">Retake</button>
+    <button class="crop-btn" id="crop-full">Full photo</button>
+    <button class="crop-btn primary" id="crop-confirm">Use this crop</button>
   </div>
 </div>
 
@@ -1190,7 +1217,7 @@
   }
   const cvOk = ()=> typeof window.cv !== 'undefined' && !!window.cv.Mat;
 
-  const cam = {running:false, stream:null, raf:0, lastT:0, stable:0, lastQuad:null, prevQuad:null, quadHist:[], appendToLast:false, track:null, torchOn:false, busy:false, armed:true, clearFrames:0, dupeHold:false, sessionHashes:[], pendingHash:null};
+  const cam = {running:false, paused:false, stream:null, raf:0, lastT:0, stable:0, lastQuad:null, prevQuad:null, quadHist:[], appendToLast:false, track:null, torchOn:false, busy:false, armed:true, clearFrames:0, dupeHold:false, sessionHashes:[], pendingHash:null};
 
   function setShutter(state){
     $('#cam-shutter').className = 'cam-shutter' + (state && state!=='idle' ? ' '+state : '');
@@ -1283,18 +1310,19 @@
       catch(e){ camStatus('Detector unavailable ('+e.message+') — tap the shutter to capture the full frame'); }
       bar.classList.remove('show');
     }
-    cam.running = true; cam.busy = false;
+    cam.running = true; cam.busy = false; cam.paused = false;
     cam.stable = 0; cam.lastQuad = null; cam.prevQuad = null; cam.quadHist = []; cam.lastT = 0;
     cam.armed = true; cam.clearFrames = 0; cam.dupeHold = false;
     cam.sessionHashes = []; cam.pendingHash = null;
     seedStrip();
     tray.forEach(r=>{ if(r.thumbUrl) hashFromDataUrl(r.thumbUrl).then(h=>{ if(h) cam.sessionHashes.push(h); }); });
     setShutter('idle');
-    if(cvOk()) camStatus('Point the camera at a receipt');
+    if(cvOk()) camStatus('Line up the receipt and tap the shutter');
     camLoop();
   }
 
   function closeCamera(){
+    if(editor.open) closeCropEditor();
     cam.running = false;
     cancelAnimationFrame(cam.raf);
     if(cam.stream){ cam.stream.getTracks().forEach(t=>t.stop()); cam.stream = null; }
@@ -1321,7 +1349,7 @@
     camStatus(cam.appendToLast ? 'Next capture adds a page to the last receipt' : 'Point the camera at a receipt');
   });
 
-  $('#cam-shutter').addEventListener('click', ()=>{ if(cam.running && !cam.busy) captureFrame(cam.lastQuad); });
+  $('#cam-shutter').addEventListener('click', ()=>captureFrame());
 
   function smoothQuad(raw){
     if(!raw){ cam.quadHist = []; return null; }
@@ -1339,8 +1367,9 @@
   function camLoop(){
     if(!cam.running) return;
     cam.raf = requestAnimationFrame(camLoop);
+    if(cam.paused) return;
     const now = performance.now();
-    if(now - cam.lastT < 90) return;
+    if(now - cam.lastT < 120) return;
     cam.lastT = now;
     const v = $('#cam-video');
     if(!v.videoWidth) return;
@@ -1354,85 +1383,62 @@
     try{ raw = detectQuad(ctx.getImageData(0,0,DET_W,detH), DET_W, detH); }catch(e){ raw = null; }
     const quad = smoothQuad(raw);
     cam.lastQuad = quad;
-
-    // Disarmed after a capture: stay locked out until the frame clears,
-    // so a stationary receipt can never be captured twice.
-    if(!cam.armed){
-      if(quad){
-        cam.clearFrames = 0;
-        drawOverlay(quad,'disarmed');
-        if(!cam.busy) camStatus('Captured — move it away or point at the next receipt');
-      }else{
-        cam.clearFrames++;
-        drawOverlay(null,'search');
-        if(cam.clearFrames >= 5){
-          cam.armed = true; cam.dupeHold = false;
-          if(!cam.busy) camStatus(cam.appendToLast ? 'Next capture adds a page to the last receipt' : 'Point the camera at a receipt');
-        }
-      }
-      setShutter(cam.armed ? 'idle' : 'disarmed');
-      cam.stable = 0; cam.prevQuad = null;
-      return;
-    }
-
-    // Holding: current receipt fingerprints like one already scanned.
-    if(cam.dupeHold){
-      if(quad){
-        cam.clearFrames = 0;
-        drawOverlay(quad,'dupe');
-        camStatus('Looks like a receipt you already scanned — shutter to capture anyway');
-        setShutter('dupe');
-      }else{
-        cam.clearFrames++;
-        drawOverlay(null,'search');
-        setShutter('idle');
-        if(cam.clearFrames >= 5){ cam.dupeHold = false; camStatus('Point the camera at a receipt'); }
-      }
-      cam.stable = 0; cam.prevQuad = null;
-      return;
-    }
-
-    // Armed: normal stability lock on smoothed corners.
-    if(quad && cam.prevQuad){
-      const move = ['tl','tr','br','bl'].reduce((s,k)=>s+Math.hypot(quad[k].x-cam.prevQuad[k].x, quad[k].y-cam.prevQuad[k].y), 0);
-      cam.stable = move < MOVE_TOL*4 ? cam.stable+1 : 0;
-    }else{
-      cam.stable = 0;
-    }
-    cam.prevQuad = quad;
-    const stable = cam.stable >= STABLE_N;
-    drawOverlay(quad, stable ? 'locked' : 'search');
-    setShutter(stable ? 'locked' : 'idle');
-    if(!cam.busy){
-      if(quad) camStatus(stable ? 'Capturing…' : 'Hold steady…');
-      else camStatus(cam.appendToLast ? 'Next capture adds a page to the last receipt' : 'Point the camera at a receipt');
-    }
-    if(stable && !cam.busy){
-      const xs = [quad.tl.x, quad.tr.x, quad.br.x, quad.bl.x];
-      const ys = [quad.tl.y, quad.tr.y, quad.br.y, quad.bl.y];
-      const bx = Math.max(0, Math.min.apply(null, xs)), by = Math.max(0, Math.min.apply(null, ys));
-      const bw = Math.max(8, Math.min(DET_W, Math.max.apply(null, xs)) - bx);
-      const bh = Math.max(8, Math.min(detH, Math.max.apply(null, ys)) - by);
-      const h = hashFromCanvasRegion(c, bx, by, bw, bh);
-      if(!cam.appendToLast && isDupeHash(h)){
-        cam.dupeHold = true; cam.stable = 0;
-        return;
-      }
-      cam.pendingHash = h;
-      captureFrame(quad);
-    }
+    // Guidance only — capture is always a deliberate shutter press.
+    drawOverlay(quad, 'search');
+    camStatus(quad
+      ? (cam.appendToLast ? 'Tap the shutter to add this as a page' : 'Tap the shutter to capture')
+      : (cam.appendToLast ? 'Next capture adds a page to the last receipt' : 'Line up the receipt and tap the shutter'));
   }
 
   function detectQuad(imgData, W, H){
+    // Live guidance: single conservative pass only, so table grain and
+    // shadows on bright surfaces don't produce phantom outlines.
     const cvm = window.cv;
     const src = cvm.matFromImageData(imgData);
     const gray = new cvm.Mat(), blur = new cvm.Mat();
     cvm.cvtColor(src, gray, cvm.COLOR_RGBA2GRAY);
     cvm.GaussianBlur(gray, blur, new cvm.Size(5,5), 0);
-    // Pass 1: normal sensitivity. Pass 2 (only when pass 1 finds nothing):
-    // high sensitivity for weak edges on bright / low-contrast backgrounds.
+    const best = scanEdges(cvm, blur, W, H, 40, 120);
+    src.delete(); gray.delete(); blur.delete();
+    return best;
+  }
+
+  function detectDocument(imgData, W, H){
+    // Post-capture: one-shot, so we can afford the full strategy ladder.
+    const cvm = window.cv;
+    const src = cvm.matFromImageData(imgData);
+    const gray = new cvm.Mat(), blur = new cvm.Mat();
+    cvm.cvtColor(src, gray, cvm.COLOR_RGBA2GRAY);
+    cvm.GaussianBlur(gray, blur, new cvm.Size(5,5), 0);
     let best = scanEdges(cvm, blur, W, H, 40, 120);
-    if(!best) best = scanEdges(cvm, blur, W, H, 8, 32);
+    if(!best) best = scanEdges(cvm, blur, W, H, 15, 50);
+    if(!best){
+      // Local-contrast strategy for near-uniform bright scenes
+      const bin = new cvm.Mat();
+      cvm.adaptiveThreshold(gray, bin, 255, cvm.ADAPTIVE_THRESH_GAUSSIAN_C, cvm.THRESH_BINARY, 35, -3);
+      const k = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(5,5));
+      cvm.morphologyEx(bin, bin, cvm.MORPH_CLOSE, k);
+      best = scanContours(cvm, bin, W, H);
+      bin.delete(); k.delete();
+    }
+    if(!best){
+      // Paper-vs-surface strategy: white paper has near-zero saturation
+      const rgb = new cvm.Mat(), hsv = new cvm.Mat();
+      cvm.cvtColor(src, rgb, cvm.COLOR_RGBA2RGB);
+      cvm.cvtColor(rgb, hsv, cvm.COLOR_RGB2HSV);
+      const ch = new cvm.MatVector();
+      cvm.split(hsv, ch);
+      const sat = ch.get(1), val = ch.get(2);
+      const m1 = new cvm.Mat(), m2 = new cvm.Mat(), mask = new cvm.Mat();
+      cvm.threshold(sat, m1, 60, 255, cvm.THRESH_BINARY_INV);
+      cvm.threshold(val, m2, 150, 255, cvm.THRESH_BINARY);
+      cvm.bitwise_and(m1, m2, mask);
+      const k2 = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(7,7));
+      cvm.morphologyEx(mask, mask, cvm.MORPH_CLOSE, k2);
+      best = scanContours(cvm, mask, W, H);
+      rgb.delete(); hsv.delete(); sat.delete(); val.delete();
+      m1.delete(); m2.delete(); mask.delete(); k2.delete(); ch.delete();
+    }
     src.delete(); gray.delete(); blur.delete();
     return best;
   }
@@ -1442,8 +1448,14 @@
     cvm.Canny(blur, edges, lo, hi);
     const kernel = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(3,3));
     cvm.dilate(edges, edges, kernel);
+    const best = scanContours(cvm, edges, W, H);
+    edges.delete(); kernel.delete();
+    return best;
+  }
+
+  function scanContours(cvm, bin, W, H){
     const contours = new cvm.MatVector(), hier = new cvm.Mat();
-    cvm.findContours(edges, contours, hier, cvm.RETR_EXTERNAL, cvm.CHAIN_APPROX_SIMPLE);
+    cvm.findContours(bin, contours, hier, cvm.RETR_EXTERNAL, cvm.CHAIN_APPROX_SIMPLE);
     const okSpan = q => {
       const xs = q.map(p=>p.x), ys = q.map(p=>p.y);
       return (Math.max.apply(null,xs)-Math.min.apply(null,xs)) > 0.35*W
@@ -1453,7 +1465,8 @@
     for(let i=0; i<contours.size(); i++){
       const cnt = contours.get(i);
       const area = cvm.contourArea(cnt);
-      if(area > 0.07*W*H){
+      // reject too-small and frame-filling degenerate blobs
+      if(area > 0.07*W*H && area < 0.94*W*H){
         const peri = cvm.arcLength(cnt, true);
         const approx = new cvm.Mat();
         cvm.approxPolyDP(cnt, approx, 0.02*peri, true);
@@ -1478,7 +1491,7 @@
       }
       cnt.delete();
     }
-    edges.delete(); kernel.delete(); contours.delete(); hier.delete();
+    contours.delete(); hier.delete();
     return best || fbQuad;
   }
 
@@ -1533,36 +1546,161 @@
       c.width = W2; c.height = H2;
       const ctx = c.getContext('2d', {willReadFrequently:true});
       ctx.drawImage(fc, 0, 0, W2, H2);
-      const q = detectQuad(ctx.getImageData(0,0,W2,H2), W2, H2);
+      const q = detectDocument(ctx.getImageData(0,0,W2,H2), W2, H2);
       return q ? {quad:q, k:fc.width/W2} : null;
     }catch(e){ return null; }
   }
 
-  async function captureFrame(quad){
-    if(cam.busy) return;
+  function captureFrame(){
+    if(!cam.running || cam.busy || editor.open) return;
     cam.busy = true;
-    camStatus('Captured');
-    flashScreen();
     const v = $('#cam-video');
     const fc = document.createElement('canvas');
     fc.width = v.videoWidth; fc.height = v.videoHeight;
     fc.getContext('2d').drawImage(v, 0, 0);
-    let dataUrl = null, k = v.videoWidth/DET_W, useQuad = quad;
-    if(!useQuad && cvOk()){
-      // Manual shutter without a live lock: run the full detector on the
-      // high-resolution still, where more detail is available.
+    cam.paused = true;
+    openCropEditor(fc, cam.appendToLast);
+    cam.busy = false;
+  }
+
+  /* =============== post-capture crop editor =============== */
+  const editor = {open:false, fc:null, quad:null, iw:0, ih:0, s:1, ox:0, oy:0, drag:null, appendMode:false, dupeArmed:false};
+
+  function scaleQuad(q, k){
+    const f = p=>({x:p.x*k, y:p.y*k});
+    return {tl:f(q.tl), tr:f(q.tr), br:f(q.br), bl:f(q.bl)};
+  }
+
+  function openCropEditor(fc, appendMode){
+    editor.open = true; editor.fc = fc;
+    editor.iw = fc.width; editor.ih = fc.height;
+    editor.appendMode = appendMode; editor.dupeArmed = false; editor.drag = null;
+    $('#crop-warn').style.display = 'none';
+    $('#crop-confirm').textContent = appendMode ? 'Add page' : 'Use this crop';
+    let q = null;
+    if(cvOk()){
       const sd = detectOnStill(fc);
-      if(sd){ useQuad = sd.quad; k = sd.k; }
+      if(sd) q = scaleQuad(expandQuad(sd.quad, 1.02), sd.k);
     }
-    if(useQuad && cvOk()){
-      try{ dataUrl = warpFromCanvas(fc, expandQuad(useQuad, 1.02), k); }
-      catch(e){ dataUrl = null; }
+    if(!q && cam.lastQuad) q = scaleQuad(expandQuad(cam.lastQuad, 1.02), editor.iw/DET_W);
+    if(!q){
+      const mx = editor.iw*0.08, my = editor.ih*0.08;
+      q = {tl:{x:mx,y:my}, tr:{x:editor.iw-mx,y:my}, br:{x:editor.iw-mx,y:editor.ih-my}, bl:{x:mx,y:editor.ih-my}};
     }
-    if(!dataUrl) dataUrl = fc.toDataURL('image/jpeg', 0.87);
+    const clamp = p=>({x:Math.min(editor.iw, Math.max(0, p.x)), y:Math.min(editor.ih, Math.max(0, p.y))});
+    editor.quad = {tl:clamp(q.tl), tr:clamp(q.tr), br:clamp(q.br), bl:clamp(q.bl)};
+    $('#cropview').classList.add('show');
+    drawEditor();
+  }
+
+  function closeCropEditor(){
+    editor.open = false; editor.fc = null;
+    $('#cropview').classList.remove('show');
+    cam.paused = false;
+  }
+
+  function drawEditor(){
+    const cnv = $('#crop-canvas');
+    const dw = cnv.clientWidth, dh = cnv.clientHeight, dpr = window.devicePixelRatio||1;
+    if(cnv.width !== Math.round(dw*dpr)){ cnv.width = Math.round(dw*dpr); cnv.height = Math.round(dh*dpr); }
+    const ctx = cnv.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,dw,dh);
+    if(!editor.fc) return;
+    const s = Math.min(dw/editor.iw, dh/editor.ih);
+    editor.s = s;
+    editor.ox = (dw - editor.iw*s)/2;
+    editor.oy = (dh - editor.ih*s)/2;
+    ctx.drawImage(editor.fc, editor.ox, editor.oy, editor.iw*s, editor.ih*s);
+    const P = p=>({x:p.x*s+editor.ox, y:p.y*s+editor.oy});
+    const pts = [P(editor.quad.tl), P(editor.quad.tr), P(editor.quad.br), P(editor.quad.bl)];
+    // dim everything outside the selection
+    ctx.beginPath();
+    ctx.rect(0,0,dw,dh);
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for(let i=1;i<4;i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fill('evenodd');
+    // outline + corner handles
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for(let i=1;i<4;i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#34d399'; ctx.stroke();
+    pts.forEach(p=>{
+      ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, Math.PI*2);
+      ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(24,24,27,.55)'; ctx.stroke();
+    });
+  }
+
+  (function(){
+    const cnv = document.getElementById('crop-canvas');
+    const KEYS = ['tl','tr','br','bl'];
+    const pos = e => { const r = cnv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
+    cnv.addEventListener('pointerdown', e=>{
+      if(!editor.open) return;
+      const p = pos(e);
+      let bestK = null, bestD = 34;
+      KEYS.forEach(k=>{
+        const q = editor.quad[k];
+        const d = Math.hypot(q.x*editor.s+editor.ox-p.x, q.y*editor.s+editor.oy-p.y);
+        if(d < bestD){ bestD = d; bestK = k; }
+      });
+      if(bestK){ editor.drag = bestK; cnv.setPointerCapture(e.pointerId); }
+    });
+    cnv.addEventListener('pointermove', e=>{
+      if(!editor.open || !editor.drag) return;
+      const p = pos(e);
+      editor.quad[editor.drag] = {
+        x: Math.min(editor.iw, Math.max(0, (p.x-editor.ox)/editor.s)),
+        y: Math.min(editor.ih, Math.max(0, (p.y-editor.oy)/editor.s))
+      };
+      drawEditor();
+    });
+    const end = ()=>{ editor.drag = null; };
+    cnv.addEventListener('pointerup', end);
+    cnv.addEventListener('pointercancel', end);
+    window.addEventListener('resize', ()=>{ if(editor.open) drawEditor(); });
+  })();
+
+  $('#crop-retake').addEventListener('click', ()=>{
+    closeCropEditor();
+    camStatus('Line up the receipt and tap the shutter');
+  });
+  $('#crop-full').addEventListener('click', ()=>{
+    editor.quad = {tl:{x:0,y:0}, tr:{x:editor.iw,y:0}, br:{x:editor.iw,y:editor.ih}, bl:{x:0,y:editor.ih}};
+    drawEditor();
+  });
+  $('#crop-confirm').addEventListener('click', async ()=>{
+    if(!editor.open || !editor.fc) return;
+    const q = editor.quad;
+    const isFull = q.tl.x<2 && q.tl.y<2 && q.br.x>editor.iw-2 && q.br.y>editor.ih-2;
+    let dataUrl;
+    if(isFull || !cvOk()){
+      dataUrl = editor.fc.toDataURL('image/jpeg', 0.87);
+    }else{
+      try{ dataUrl = warpFromCanvas(editor.fc, q, 1); }
+      catch(e){ dataUrl = editor.fc.toDataURL('image/jpeg', 0.87); }
+    }
+    if(!editor.appendMode && !editor.dupeArmed){
+      const h = await hashFromDataUrl(dataUrl);
+      if(isDupeHash(h)){
+        editor.dupeArmed = true;
+        $('#crop-warn').style.display = 'block';
+        $('#crop-confirm').textContent = 'Add anyway';
+        return;
+      }
+      if(h) cam.sessionHashes.push(h);
+    }else if(editor.dupeArmed){
+      hashFromDataUrl(dataUrl).then(h=>{ if(h) cam.sessionHashes.push(h); });
+    }
+    const appendMode = editor.appendMode;
+    closeCropEditor();
+    flashScreen();
     if(navigator.vibrate) navigator.vibrate(40);
-    if(cam.pendingHash){ cam.sessionHashes.push(cam.pendingHash); cam.pendingHash = null; }
-    else hashFromDataUrl(dataUrl).then(h=>{ if(h) cam.sessionHashes.push(h); });
-    if(cam.appendToLast && tray.length){
+    if(appendMode && tray.length){
       cam.appendToLast = false;
       $('#cam-addpage').classList.remove('on');
       const r = tray[tray.length-1];
@@ -1575,11 +1713,8 @@
       addReceiptFromDataUrl(dataUrl).then(r=>{ if(r && r.thumbUrl) addStripThumb(r.thumbUrl); });
     }
     updateCamCount();
-    // Disarm: auto-capture stays off until the frame clears (see camLoop).
-    cam.armed = false; cam.clearFrames = 0; cam.dupeHold = false;
-    cam.stable = 0; cam.quadHist = []; cam.prevQuad = null;
-    cam.busy = false;
-  }
+    camStatus('Captured — line up the next receipt');
+  });
 
   function warpFromCanvas(canvas, q, k){
     const cvm = window.cv;
