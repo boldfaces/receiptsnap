@@ -312,6 +312,11 @@
   .crop-bottom{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:14px 16px calc(18px + env(safe-area-inset-bottom));background:linear-gradient(180deg,transparent,rgba(0,0,0,.55))}
   .crop-btn{flex:1;padding:14px 8px;border-radius:12px;font-weight:600;font-size:13.5px;background:rgba(255,255,255,.16);color:#fff;backdrop-filter:blur(6px)}
   .crop-btn.primary{background:#fff;color:#18181b;flex:1.5}
+  .crop-loupe{position:absolute;top:calc(70px + env(safe-area-inset-top));width:132px;height:132px;border-radius:50%;border:2px solid rgba(255,255,255,.92);box-shadow:0 10px 28px rgba(0,0,0,.55);overflow:hidden;background:#000;pointer-events:none;display:none;z-index:3}
+  .crop-loupe.show{display:block}
+  .crop-loupe.left{left:14px}
+  .crop-loupe.right{right:14px}
+  .crop-loupe canvas{display:block}
   .cam-side{color:#fff;font-size:12px;font-weight:600;background:rgba(24,24,27,.55);border-radius:10px;padding:10px 12px;line-height:1.25;min-width:76px;backdrop-filter:blur(6px)}
   .cam-side.on{background:#fff;color:#18181b}
   .cam-count{color:rgba(255,255,255,.85);font-size:12px;margin-top:12px;font-weight:500;min-height:15px}
@@ -499,7 +504,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.8</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.9</span></div>
         </div>
       </div>
     </section>
@@ -570,6 +575,7 @@
 <!-- post-capture crop editor -->
 <div class="cropview" id="cropview">
   <canvas id="crop-canvas"></canvas>
+  <div class="crop-loupe" id="crop-loupe"><canvas id="crop-loupe-canvas"></canvas></div>
   <div class="crop-top">
     <div class="crop-title">Adjust the crop</div>
     <div class="crop-hint">Drag the corners to match the receipt</div>
@@ -1405,23 +1411,49 @@
 
   function detectDocument(imgData, W, H){
     // Post-capture: one-shot, so we can afford the full strategy ladder.
+    // All strategies run; the winner is the candidate whose interior most
+    // out-brightens its surroundings (receipts are bright paper).
     const cvm = window.cv;
+    const MIN_A = 0.045; // long receipts shot with margin run small
     const src = cvm.matFromImageData(imgData);
-    const gray = new cvm.Mat(), blur = new cvm.Mat();
+    const gray = new cvm.Mat();
     cvm.cvtColor(src, gray, cvm.COLOR_RGBA2GRAY);
+    const blur = new cvm.Mat(), heavy = new cvm.Mat();
     cvm.GaussianBlur(gray, blur, new cvm.Size(5,5), 0);
-    let best = scanEdges(cvm, blur, W, H, 40, 120);
-    if(!best) best = scanEdges(cvm, blur, W, H, 15, 50);
-    if(!best){
-      // Local-contrast strategy for near-uniform bright scenes
+    cvm.GaussianBlur(gray, heavy, new cvm.Size(9,9), 0);
+    const cands = [];
+    const push = q=>{ if(q) cands.push(q); };
+    push(scanEdges(cvm, blur, W, H, 40, 120, MIN_A));
+    push(scanEdges(cvm, blur, W, H, 15, 50, MIN_A));
+    // Texture-melting pass: heavy blur dissolves marble veins and wood grain
+    // while the receipt's stronger boundary survives.
+    push(scanEdges(cvm, heavy, W, H, 30, 90, MIN_A));
+    {
+      // Global brightness split: the receipt is the brightest LARGE blob.
+      // Morphological open erases thin highlight streaks first.
       const bin = new cvm.Mat();
+      cvm.threshold(blur, bin, 0, 255, cvm.THRESH_BINARY + cvm.THRESH_OTSU);
+      const kOpen = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(9,9));
+      cvm.morphologyEx(bin, bin, cvm.MORPH_OPEN, kOpen);
+      const kClose = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(7,7));
+      cvm.morphologyEx(bin, bin, cvm.MORPH_CLOSE, kClose);
+      push(scanContours(cvm, bin, W, H, MIN_A));
+      bin.delete(); kOpen.delete(); kClose.delete();
+    }
+    {
+      // Local-contrast strategy for near-uniform bright scenes
+      const bin = cvm.Mat ? new cvm.Mat() : null;
       cvm.adaptiveThreshold(gray, bin, 255, cvm.ADAPTIVE_THRESH_GAUSSIAN_C, cvm.THRESH_BINARY, 35, -3);
       const k = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(5,5));
       cvm.morphologyEx(bin, bin, cvm.MORPH_CLOSE, k);
-      best = scanContours(cvm, bin, W, H);
+      push(scanContours(cvm, bin, W, H, MIN_A));
       bin.delete(); k.delete();
     }
-    if(!best){
+    // Content-cluster strategy: when the paper boundary produces no edges at
+    // all (white receipt on white marble in flat light), the printed text and
+    // QR still do. Merge those fragments into one blob and bound it.
+    push(scanContentCluster(cvm, blur, W, H));
+    {
       // Paper-vs-surface strategy: white paper has near-zero saturation
       const rgb = new cvm.Mat(), hsv = new cvm.Mat();
       cvm.cvtColor(src, rgb, cvm.COLOR_RGBA2RGB);
@@ -1435,25 +1467,84 @@
       cvm.bitwise_and(m1, m2, mask);
       const k2 = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(7,7));
       cvm.morphologyEx(mask, mask, cvm.MORPH_CLOSE, k2);
-      best = scanContours(cvm, mask, W, H);
+      push(scanContours(cvm, mask, W, H, MIN_A));
       rgb.delete(); hsv.delete(); sat.delete(); val.delete();
       m1.delete(); m2.delete(); mask.delete(); k2.delete(); ch.delete();
     }
-    src.delete(); gray.delete(); blur.delete();
+    let best = null, bestScore = -1e9;
+    for(const q of cands){
+      const sc = quadScore(cvm, gray, q, W, H);
+      if(sc > bestScore){ bestScore = sc; best = q; }
+    }
+    src.delete(); gray.delete(); blur.delete(); heavy.delete();
     return best;
   }
 
-  function scanEdges(cvm, blur, W, H, lo, hi){
+  function quadScore(cvm, gray, q, W, H){
+    // Interior-vs-exterior mean brightness: paper should out-brighten the scene.
+    try{
+      const cover = Math.abs(
+        (q.tl.x*(q.tr.y-q.bl.y) + q.tr.x*(q.br.y-q.tl.y) + q.br.x*(q.bl.y-q.tr.y) + q.bl.x*(q.tl.y-q.br.y)) / 2
+      ) / (W*H);
+      if(cover > 0.92 || cover < 0.02) return -1e9;
+      const mask = cvm.Mat.zeros(H, W, cvm.CV_8UC1);
+      const pts = cvm.matFromArray(4, 1, cvm.CV_32SC2,
+        [q.tl.x|0, q.tl.y|0, q.tr.x|0, q.tr.y|0, q.br.x|0, q.br.y|0, q.bl.x|0, q.bl.y|0]);
+      const vec = new cvm.MatVector();
+      vec.push_back(pts);
+      cvm.fillPoly(mask, vec, new cvm.Scalar(255));
+      const inMean = cvm.mean(gray, mask)[0];
+      const inv = new cvm.Mat();
+      cvm.bitwise_not(mask, inv);
+      const outMean = cvm.mean(gray, inv)[0];
+      mask.delete(); inv.delete(); pts.delete(); vec.delete();
+      if(!outMean || !inMean) return -1e9;
+      return inMean - outMean;
+    }catch(e){ return 0; }
+  }
+
+  function scanContentCluster(cvm, blur, W, H){
+    // Bound the printed content (text, QR) and expand to approximate the paper.
+    try{
+      const edges = new cvm.Mat();
+      cvm.Canny(blur, edges, 40, 120);
+      const k = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(31,31));
+      cvm.morphologyEx(edges, edges, cvm.MORPH_CLOSE, k);
+      const contours = new cvm.MatVector(), hier = new cvm.Mat();
+      cvm.findContours(edges, contours, hier, cvm.RETR_EXTERNAL, cvm.CHAIN_APPROX_SIMPLE);
+      let best = null, bestArea = 0;
+      for(let i=0; i<contours.size(); i++){
+        const cnt = contours.get(i);
+        const area = cvm.contourArea(cnt);
+        if(area > 0.03*W*H && area < 0.6*W*H && area > bestArea){
+          const rr = cvm.minAreaRect(cnt);
+          const rp = cvm.RotatedRect.points(rr);
+          const q = [0,1,2,3].map(j=>({x:rp[j].x, y:rp[j].y}));
+          const xs = q.map(p=>p.x), ys = q.map(p=>p.y);
+          const bw = Math.max.apply(null,xs)-Math.min.apply(null,xs);
+          const bh = Math.max.apply(null,ys)-Math.min.apply(null,ys);
+          if(bw > 0.2*W || bh > 0.35*H){ best = orderQuad(q); bestArea = area; }
+        }
+        cnt.delete();
+      }
+      edges.delete(); k.delete(); contours.delete(); hier.delete();
+      // content sits inside the paper margins; grow the box to approximate them
+      return best ? expandQuad(best, 1.10) : null;
+    }catch(e){ return null; }
+  }
+
+  function scanEdges(cvm, blur, W, H, lo, hi, minA){
     const edges = new cvm.Mat();
     cvm.Canny(blur, edges, lo, hi);
     const kernel = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(3,3));
     cvm.dilate(edges, edges, kernel);
-    const best = scanContours(cvm, edges, W, H);
+    const best = scanContours(cvm, edges, W, H, minA);
     edges.delete(); kernel.delete();
     return best;
   }
 
-  function scanContours(cvm, bin, W, H){
+  function scanContours(cvm, bin, W, H, minA){
+    const MIN = (minA || 0.07) * W * H;
     const contours = new cvm.MatVector(), hier = new cvm.Mat();
     cvm.findContours(bin, contours, hier, cvm.RETR_EXTERNAL, cvm.CHAIN_APPROX_SIMPLE);
     const okSpan = q => {
@@ -1461,12 +1552,16 @@
       return (Math.max.apply(null,xs)-Math.min.apply(null,xs)) > 0.35*W
           || (Math.max.apply(null,ys)-Math.min.apply(null,ys)) > 0.45*H;
     };
+    const polyArea = q => Math.abs(
+      (q[0].x*(q[1].y-q[3].y) + q[1].x*(q[2].y-q[0].y) + q[2].x*(q[3].y-q[1].y) + q[3].x*(q[0].y-q[2].y)) / 2
+    );
+    const okQuad = q => okSpan(q) && polyArea(q) < 0.90*W*H;
     let best = null, bestArea = 0, fbQuad = null, fbArea = 0;
     for(let i=0; i<contours.size(); i++){
       const cnt = contours.get(i);
       const area = cvm.contourArea(cnt);
       // reject too-small and frame-filling degenerate blobs
-      if(area > 0.07*W*H && area < 0.94*W*H){
+      if(area > MIN && area < 0.94*W*H){
         const peri = cvm.arcLength(cnt, true);
         const approx = new cvm.Mat();
         cvm.approxPolyDP(cnt, approx, 0.02*peri, true);
@@ -1474,7 +1569,7 @@
         if(approx.rows === 4 && cvm.isContourConvex(approx)){
           for(let j=0; j<4; j++) pts.push({x:approx.data32S[j*2], y:approx.data32S[j*2+1]});
         }
-        if(pts.length === 4 && area > bestArea && okSpan(pts)){
+        if(pts.length === 4 && area > bestArea && okQuad(pts)){
           best = orderQuad(pts); bestArea = area;
         }else if(!pts.length && area > fbArea){
           // Imperfect outline (e.g. a thumb over one edge): fit a rotated
@@ -1484,7 +1579,7 @@
           if(rrArea > 0 && area/rrArea > 0.72){
             const rp = cvm.RotatedRect.points(rr);
             const q = [0,1,2,3].map(j=>({x:rp[j].x, y:rp[j].y}));
-            if(okSpan(q)){ fbQuad = orderQuad(q); fbArea = area; }
+            if(okQuad(q)){ fbQuad = orderQuad(q); fbArea = area; }
           }
         }
         approx.delete();
@@ -1635,6 +1730,38 @@
     });
   }
 
+  function updateLoupe(pointerX){
+    if(!editor.open || !editor.drag || !editor.fc) return;
+    const lp = $('#crop-loupe');
+    lp.classList.add('show');
+    const onLeftHalf = pointerX <= $('#crop-canvas').clientWidth/2;
+    lp.classList.toggle('right', onLeftHalf);
+    lp.classList.toggle('left', !onLeftHalf);
+    const CSSD = 132, dpr = window.devicePixelRatio||1;
+    const c = $('#crop-loupe-canvas');
+    if(c.width !== CSSD*dpr){ c.width = CSSD*dpr; c.height = CSSD*dpr; c.style.width = CSSD+'px'; c.style.height = CSSD+'px'; }
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    const q = editor.quad[editor.drag];
+    const ZOOM = 2.5; // relative to the on-screen preview scale
+    const srcW = CSSD/(editor.s*ZOOM);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0,0,CSSD,CSSD);
+    ctx.drawImage(editor.fc, q.x-srcW/2, q.y-srcW/2, srcW, srcW, 0, 0, CSSD, CSSD);
+    ctx.strokeStyle = 'rgba(52,211,153,.95)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(CSSD/2, 10);       ctx.lineTo(CSSD/2, CSSD/2-9);
+    ctx.moveTo(CSSD/2, CSSD/2+9); ctx.lineTo(CSSD/2, CSSD-10);
+    ctx.moveTo(10, CSSD/2);       ctx.lineTo(CSSD/2-9, CSSD/2);
+    ctx.moveTo(CSSD/2+9, CSSD/2); ctx.lineTo(CSSD-10, CSSD/2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(CSSD/2, CSSD/2, 7, 0, Math.PI*2);
+    ctx.stroke();
+  }
+  function hideLoupe(){ $('#crop-loupe').classList.remove('show'); }
+
   (function(){
     const cnv = document.getElementById('crop-canvas');
     const KEYS = ['tl','tr','br','bl'];
@@ -1648,7 +1775,11 @@
         const d = Math.hypot(q.x*editor.s+editor.ox-p.x, q.y*editor.s+editor.oy-p.y);
         if(d < bestD){ bestD = d; bestK = k; }
       });
-      if(bestK){ editor.drag = bestK; cnv.setPointerCapture(e.pointerId); }
+      if(bestK){
+        editor.drag = bestK;
+        cnv.setPointerCapture(e.pointerId);
+        updateLoupe(p.x);
+      }
     });
     cnv.addEventListener('pointermove', e=>{
       if(!editor.open || !editor.drag) return;
@@ -1658,8 +1789,9 @@
         y: Math.min(editor.ih, Math.max(0, (p.y-editor.oy)/editor.s))
       };
       drawEditor();
+      updateLoupe(p.x);
     });
-    const end = ()=>{ editor.drag = null; };
+    const end = ()=>{ editor.drag = null; hideLoupe(); };
     cnv.addEventListener('pointerup', end);
     cnv.addEventListener('pointercancel', end);
     window.addEventListener('resize', ()=>{ if(editor.open) drawEditor(); });
