@@ -143,6 +143,8 @@
   .hist-group{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden}
   .hist-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--border)}
   .hist-row:last-child{border-bottom:none}
+  .hist-row.editable{cursor:pointer}
+  .hist-row.editable:active{background:#fafafa}
   .hist-row .info{flex:1;min-width:0}
   .hist-row .merchant{font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hist-row .meta{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -504,7 +506,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">1.9</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.0</span></div>
         </div>
       </div>
     </section>
@@ -654,6 +656,44 @@
     <button class="btn btn-danger" id="btn-purge-run" disabled>Erase everything</button>
   </div>
   <div class="setup-status" id="purge-status"></div>
+</div>
+
+<!-- edit filed receipt sheet -->
+<div class="sheet" id="edit-sheet" role="dialog" aria-modal="true" aria-label="Edit filed receipt">
+  <div class="grab"></div>
+  <div class="sheet-head">
+    <div class="t">
+      <h2>Edit filed receipt</h2>
+      <p>Changes are written straight into Claims.xlsx. The PDF stays as it is.</p>
+    </div>
+  </div>
+  <div class="field">
+    <label for="e-merchant">Merchant</label>
+    <input class="input" id="e-merchant" type="text">
+  </div>
+  <div class="frow">
+    <div class="field">
+      <label for="e-date">Date</label>
+      <input class="input" id="e-date" type="date">
+    </div>
+    <div class="field">
+      <label for="e-amount">Amount (RM)</label>
+      <input class="input mono" id="e-amount" type="number" step="0.01" inputmode="decimal">
+    </div>
+  </div>
+  <div class="field">
+    <label>Purpose</label>
+    <div class="chips" id="e-chips"></div>
+  </div>
+  <div class="field" id="e-other-wrap" style="display:none">
+    <label for="e-other">Describe the purpose</label>
+    <input class="input" id="e-other" type="text">
+  </div>
+  <div class="sheet-actions">
+    <button class="btn btn-outline" id="btn-edit-cancel">Cancel</button>
+    <button class="btn btn-primary" id="btn-edit-save">Save changes</button>
+  </div>
+  <div class="setup-status" id="edit-status"></div>
 </div>
 
 <!-- submit progress overlay -->
@@ -1054,7 +1094,7 @@
   }
 
   /* =============== Claude extraction =============== */
-  const PROMPT = 'Read this receipt photo. If more than one image is provided, they are sequential segments of the SAME single receipt, ordered top to bottom. Respond with ONLY a JSON object, no markdown, no explanation: {"merchant": string (business name in proper case), "date": "YYYY-MM-DD" or null if unreadable, "total": number (the final amount actually paid, after tax, service charge and rounding) or null, "currency": ISO 4217 code string, "confidence": "high" or "low", "reason": string (only when confidence is low, one short sentence why)}';
+  const PROMPT = 'Read this receipt photo. If more than one image is provided, they are sequential segments of the SAME single receipt, ordered top to bottom. This is a Malaysian receipt: dates are written day/month/year, so 11/09/2026 means 11 September 2026. Never interpret a date as month/day/year. Respond with ONLY a JSON object, no markdown, no explanation: {"merchant": string (business name in proper case), "date": "YYYY-MM-DD" or null if unreadable, "total": number (the final amount actually paid, after tax, service charge and rounding) or null, "currency": ISO 4217 code string, "confidence": "high" or "low", "reason": string (only when confidence is low, one short sentence why)}';
 
   async function extract(receipt){
     const key = S.get('apiKey','');
@@ -1129,15 +1169,33 @@
     return r;
   }
 
+  function saneDate(iso){
+    // A receipt date in the future almost always means day/month were swapped.
+    // If swapping gives a plausible past date, use it and flag for review.
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||'');
+    if(!m) return {iso: todayISO(), note:''};
+    const y = +m[1], mo = +m[2], d = +m[3];
+    const today = new Date(); today.setHours(23,59,59,999);
+    const dt = new Date(y, mo-1, d);
+    if(dt <= today) return {iso, note:''};
+    if(d <= 12){
+      const sw = new Date(y, d-1, mo);
+      if(sw <= today) return {iso: y+'-'+String(d).padStart(2,'0')+'-'+String(mo).padStart(2,'0'), note:'Date looked like month/day; corrected to day/month. Please confirm.'};
+    }
+    return {iso, note:'Date reads as being in the future; check it.'};
+  }
+
   async function runExtraction(r){
     try{
       const out = await extract(r);
       r.merchant = (out.merchant||'').trim() || 'Unknown merchant';
       r.amount = (typeof out.total==='number' && out.total>0) ? out.total : null;
-      r.dateISO = /^\d{4}-\d{2}-\d{2}$/.test(out.date||'') ? out.date : todayISO();
+      const sd = saneDate(out.date);
+      r.dateISO = sd.iso;
       const cur = (out.currency||'MYR').toUpperCase();
       r.flag = false; r.flagReason = '';
-      if(out.confidence==='low'){ r.flag = true; r.flagReason = out.reason || 'The receipt was hard to read.'; }
+      if(sd.note){ r.flag = true; r.flagReason = sd.note; }
+      if(out.confidence==='low'){ r.flag = true; r.flagReason = (r.flagReason?r.flagReason+' ':'')+(out.reason || 'The receipt was hard to read.'); }
       if(cur!=='MYR'){ r.flag = true; r.flagReason = (r.flagReason?r.flagReason+' ':'')+'Currency read as '+cur+', not RM.'; }
       if(r.amount===null){ r.flag = true; r.flagReason = (r.flagReason?r.flagReason+' ':'')+'Total could not be read; enter it manually.'; r.amount = 0; }
       r.status = r.flag ? 'warn' : 'review';
@@ -1428,18 +1486,9 @@
     // Texture-melting pass: heavy blur dissolves marble veins and wood grain
     // while the receipt's stronger boundary survives.
     push(scanEdges(cvm, heavy, W, H, 30, 90, MIN_A));
-    {
-      // Global brightness split: the receipt is the brightest LARGE blob.
-      // Morphological open erases thin highlight streaks first.
-      const bin = new cvm.Mat();
-      cvm.threshold(blur, bin, 0, 255, cvm.THRESH_BINARY + cvm.THRESH_OTSU);
-      const kOpen = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(9,9));
-      cvm.morphologyEx(bin, bin, cvm.MORPH_OPEN, kOpen);
-      const kClose = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(7,7));
-      cvm.morphologyEx(bin, bin, cvm.MORPH_CLOSE, kClose);
-      push(scanContours(cvm, bin, W, H, MIN_A));
-      bin.delete(); kOpen.delete(); kClose.delete();
-    }
+    // Hull passes: recover receipts whose outline is open on one side
+    push(scanHull(cvm, blur, W, H, 40, 120));
+    push(scanHull(cvm, blur, W, H, 20, 60));
     {
       // Local-contrast strategy for near-uniform bright scenes
       const bin = cvm.Mat ? new cvm.Mat() : null;
@@ -1481,26 +1530,78 @@
   }
 
   function quadScore(cvm, gray, q, W, H){
-    // Interior-vs-exterior mean brightness: paper should out-brighten the scene.
+    // Contrast of the interior against a ring immediately around the quad
+    // (not the whole frame, which rewards lighting gradients), with a
+    // penalty for candidates anchored to the frame edges.
     try{
       const cover = Math.abs(
         (q.tl.x*(q.tr.y-q.bl.y) + q.tr.x*(q.br.y-q.tl.y) + q.br.x*(q.bl.y-q.tr.y) + q.bl.x*(q.tl.y-q.br.y)) / 2
       ) / (W*H);
       if(cover > 0.92 || cover < 0.02) return -1e9;
+      const m = 0.015; let onBorder = 0;
+      [q.tl,q.tr,q.br,q.bl].forEach(p=>{
+        if(p.x < m*W || p.x > (1-m)*W || p.y < m*H || p.y > (1-m)*H) onBorder++;
+      });
+      if(onBorder >= 3) return -1e9;
       const mask = cvm.Mat.zeros(H, W, cvm.CV_8UC1);
       const pts = cvm.matFromArray(4, 1, cvm.CV_32SC2,
         [q.tl.x|0, q.tl.y|0, q.tr.x|0, q.tr.y|0, q.br.x|0, q.br.y|0, q.bl.x|0, q.bl.y|0]);
       const vec = new cvm.MatVector();
       vec.push_back(pts);
       cvm.fillPoly(mask, vec, new cvm.Scalar(255));
+      const rw = Math.max(9, Math.round(0.06*Math.min(W,H)) | 1);
+      const kr = cvm.getStructuringElement(cvm.MORPH_ELLIPSE, new cvm.Size(rw, rw));
+      const dil = new cvm.Mat(), ring = new cvm.Mat();
+      cvm.dilate(mask, dil, kr);
+      cvm.subtract(dil, mask, ring);
       const inMean = cvm.mean(gray, mask)[0];
-      const inv = new cvm.Mat();
-      cvm.bitwise_not(mask, inv);
-      const outMean = cvm.mean(gray, inv)[0];
-      mask.delete(); inv.delete(); pts.delete(); vec.delete();
-      if(!outMean || !inMean) return -1e9;
-      return inMean - outMean;
+      const ringMean = cvm.mean(gray, ring)[0];
+      mask.delete(); pts.delete(); vec.delete(); kr.delete(); dil.delete(); ring.delete();
+      if(!inMean || !ringMean) return -1e9;
+      return (inMean - ringMean) - onBorder*12;
     }catch(e){ return 0; }
+  }
+
+  function scanHull(cvm, blur, W, H, lo, hi){
+    // Outline with one side missing (curled bottom edge) encloses no area,
+    // but its convex hull is the full receipt rectangle.
+    try{
+      const edges = new cvm.Mat();
+      cvm.Canny(blur, edges, lo, hi);
+      const k = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(5,5));
+      cvm.dilate(edges, edges, k);
+      const contours = new cvm.MatVector(), hier = new cvm.Mat();
+      cvm.findContours(edges, contours, hier, cvm.RETR_EXTERNAL, cvm.CHAIN_APPROX_SIMPLE);
+      let best = null, bestArea = 0;
+      for(let i=0; i<contours.size(); i++){
+        const cnt = contours.get(i);
+        const bb = cvm.boundingRect(cnt);
+        if(bb.width > 0.3*W || bb.height > 0.4*H){
+          const hull = new cvm.Mat();
+          cvm.convexHull(cnt, hull, false, true);
+          const ha = cvm.contourArea(hull);
+          if(ha > 0.045*W*H && ha < 0.90*W*H && ha > bestArea){
+            const peri = cvm.arcLength(hull, true);
+            const ap = new cvm.Mat();
+            cvm.approxPolyDP(hull, ap, 0.04*peri, true);
+            let q;
+            if(ap.rows === 4){
+              q = []; for(let j=0;j<4;j++) q.push({x:ap.data32S[j*2], y:ap.data32S[j*2+1]});
+            }else{
+              const rr = cvm.minAreaRect(hull);
+              const rp = cvm.RotatedRect.points(rr);
+              q = [0,1,2,3].map(j=>({x:rp[j].x, y:rp[j].y}));
+            }
+            best = orderQuad(q); bestArea = ha;
+            ap.delete();
+          }
+          hull.delete();
+        }
+        cnt.delete();
+      }
+      edges.delete(); k.delete(); contours.delete(); hier.delete();
+      return best;
+    }catch(e){ return null; }
   }
 
   function scanContentCluster(cvm, blur, W, H){
@@ -1702,10 +1803,17 @@
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.clearRect(0,0,dw,dh);
     if(!editor.fc) return;
-    const s = Math.min(dw/editor.iw, dh/editor.ih);
+    // Fit the image into the zone between the top hint and the bottom
+    // buttons, so corner handles can never sit under the controls.
+    const cr = cnv.getBoundingClientRect();
+    const topEl = document.querySelector('.crop-top'), botEl = document.querySelector('.crop-bottom');
+    const topInset = Math.max(0, topEl.getBoundingClientRect().bottom - cr.top) + 10;
+    const bottomInset = Math.max(0, cr.bottom - botEl.getBoundingClientRect().top) + 10;
+    const ah = Math.max(60, dh - topInset - bottomInset);
+    const s = Math.min(dw/editor.iw, ah/editor.ih);
     editor.s = s;
     editor.ox = (dw - editor.iw*s)/2;
-    editor.oy = (dh - editor.ih*s)/2;
+    editor.oy = topInset + (ah - editor.ih*s)/2;
     ctx.drawImage(editor.fc, editor.ox, editor.oy, editor.iw*s, editor.ih*s);
     const P = p=>({x:p.x*s+editor.ox, y:p.y*s+editor.oy});
     const pts = [P(editor.quad.tl), P(editor.quad.tr), P(editor.quad.br), P(editor.quad.bl)];
@@ -1968,7 +2076,7 @@
     $('#sheet').classList.remove('show');
     activeId = null;
   }
-  $('#scrim').addEventListener('click', ()=>{ closeSheet(); closePurge(); });
+  $('#scrim').addEventListener('click', ()=>{ closeSheet(); closePurge(); closeEditSheet(); });
   $('#btn-photo-toggle').addEventListener('click', ()=>{
     const p = $('#full-photos');
     p.classList.toggle('show');
@@ -2209,8 +2317,8 @@
       if(!res.ok) throw new Error('Could not load history ('+res.status+')');
       const data = await res.json();
       historyRows = (data.value||[])
-        .map(row=>row.values[0])
-        .filter(r=>Array.isArray(r) && r.some(c=>c!==null && c!==''))
+        .map(row=>{ const v = row.values[0]; if(Array.isArray(v)) v[6] = row.index; return v; })
+        .filter(r=>Array.isArray(r) && r.slice(0,6).some(c=>c!==null && c!==''))
         .map(row=>{
           const iso = rowDateISO(row[0]);
           if(iso) row[0] = iso;
@@ -2253,18 +2361,19 @@
     }
     const groups = {};
     const order = [];
-    historyRows.slice().reverse().forEach(row=>{
+    historyRows.map((row,i)=>({row,i})).reverse().forEach(({row,i})=>{
       const key = monthKeyOf(row[0]);
       if(!groups[key]){ groups[key]=[]; order.push(key); }
-      groups[key].push(row);
+      groups[key].push({row,i});
     });
     el.innerHTML = order.map(month=>{
       const rows = groups[month];
-      const total = rows.reduce((s,r)=>s+(parseFloat(r[3])||0),0);
+      const total = rows.reduce((s,x)=>s+(parseFloat(x.row[3])||0),0);
       return '<div class="month-head"><h3>'+month+'</h3><span class="total">RM '+fmt(total)+'</span></div>'
-        +'<div class="hist-group">'+rows.map(r=>{
+        +'<div class="hist-group">'+rows.map(({row:r,i})=>{
           const link = r[4] ? '<a class="pdf-link" href="'+esc(r[4])+'" target="_blank" rel="noopener" title="Open PDF in OneDrive"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>' : '';
-          return '<div class="hist-row">'
+          const editable = r[6]!==undefined && r[6]!==null;
+          return '<div class="hist-row'+(editable?' editable':'')+'" data-i="'+i+'">'
             +'<div class="info"><div class="merchant">'+esc(r[1])+'</div>'
             +'<div class="meta"><span>'+shortDate(r[0])+'</span><span class="purpose-badge">'+esc(r[2])+'</span></div></div>'
             +'<div class="amount">RM '+fmt(parseFloat(r[3])||0)+'</div>'
@@ -2272,6 +2381,12 @@
           +'</div>';
         }).join('')+'</div>';
     }).join('');
+    el.querySelectorAll('.hist-row.editable').forEach(row=>{
+      row.addEventListener('click', e=>{
+        if(e.target.closest('.pdf-link')) return;
+        openEditSheet(+row.dataset.i);
+      });
+    });
   }
 
   function renderMonthChart(){
@@ -2509,6 +2624,95 @@
       +'</div>';
     }).join('');
   }
+
+  /* =============== edit filed receipts =============== */
+  let editIdx = null;
+
+  function renderChipsInto(container, selected, onSelect){
+    container.innerHTML = labels().map(p=>
+      '<button type="button" class="chip'+(p===selected?' on':'')+'" data-p="'+esc(p)+'">'+esc(p)+'</button>'
+    ).join('');
+    container.querySelectorAll('.chip').forEach(c=>{
+      c.addEventListener('click', ()=>{ renderChipsInto(container, c.dataset.p, onSelect); onSelect(c.dataset.p); });
+    });
+  }
+
+  function openEditSheet(i){
+    const row = historyRows[i];
+    if(!row) return;
+    if(row[6]===undefined || row[6]===null){ toast('Tap Refresh first so this row can be edited'); return; }
+    editIdx = i;
+    const purpose = row[2] || '';
+    const known = labels().includes(purpose) && purpose!=='Others';
+    $('#e-merchant').value = row[1] || '';
+    $('#e-date').value = rowDateISO(row[0]) || '';
+    $('#e-amount').value = (parseFloat(row[3])||0).toFixed(2);
+    renderChipsInto($('#e-chips'), known ? purpose : 'Others', v=>{
+      $('#e-other-wrap').style.display = v==='Others' ? 'block' : 'none';
+      if(v==='Others') $('#e-other').focus();
+    });
+    $('#e-other').value = known ? '' : purpose;
+    $('#e-other-wrap').style.display = known ? 'none' : 'block';
+    $('#edit-status').textContent = '';
+    $('#edit-status').className = 'setup-status';
+    $('#btn-edit-save').disabled = false;
+    $('#scrim').classList.add('show');
+    $('#edit-sheet').classList.add('show');
+  }
+
+  function closeEditSheet(){
+    $('#edit-sheet').classList.remove('show');
+    if(!$('#sheet').classList.contains('show') && !$('#purge-sheet').classList.contains('show')) $('#scrim').classList.remove('show');
+    editIdx = null;
+  }
+  $('#btn-edit-cancel').addEventListener('click', closeEditSheet);
+
+  async function updateRow(index, values){
+    const base = '/me/drive/root:'+encPath(basePath()+'/'+WB_NAME)+":/workbook/tables('"+TABLE+"')/rows/itemAt(index="+index+")";
+    const body = JSON.stringify({values:[values]});
+    let res = await graph(base, {method:'PATCH', headers:{'Content-Type':'application/json'}, body});
+    if(!res.ok){
+      res = await graph(base+'/range', {method:'PATCH', headers:{'Content-Type':'application/json'}, body});
+    }
+    if(!res.ok){
+      const err = await res.json().catch(()=>({}));
+      throw new Error('Could not update the row: '+((err.error&&err.error.message)||res.status));
+    }
+  }
+
+  $('#btn-edit-save').addEventListener('click', async ()=>{
+    if(editIdx===null) return;
+    if(!isOnline()){ toast('Editing a filed receipt needs a connection'); return; }
+    const row = historyRows[editIdx];
+    const sel = $('#e-chips .chip.on');
+    if(!sel){ toast('Pick a purpose label'); return; }
+    const amt = parseFloat($('#e-amount').value);
+    if(!(amt>0)){ toast('Amount must be above zero'); return; }
+    const purposeText = sel.dataset.p==='Others' ? $('#e-other').value.trim() : sel.dataset.p;
+    if(!purposeText){ toast('Describe the purpose'); return; }
+    const values = [
+      $('#e-date').value || rowDateISO(row[0]) || todayISO(),
+      $('#e-merchant').value.trim() || row[1],
+      purposeText,
+      Math.round(amt*100)/100,
+      row[4] || '',
+      row[5] || ''
+    ];
+    const st = $('#edit-status');
+    st.className = 'setup-status'; st.textContent = 'Saving to '+WB_NAME+'…';
+    $('#btn-edit-save').disabled = true;
+    try{
+      await updateRow(row[6], values);
+      row[0] = values[0]; row[1] = values[1]; row[2] = values[2]; row[3] = values[3];
+      S.set('historyCache', historyRows);
+      renderHistory(); renderMonthChart();
+      toast('Receipt updated in '+WB_NAME);
+      closeEditSheet();
+    }catch(e){
+      st.className = 'setup-status bad'; st.textContent = e.message;
+      $('#btn-edit-save').disabled = false;
+    }
+  });
 
   /* =============== purge / reset =============== */
   function closePurge(){
