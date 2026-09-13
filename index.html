@@ -109,6 +109,9 @@
   @keyframes spin{to{transform:rotate(360deg)}}
 
   .purpose-badge{font-size:11px;font-weight:500;color:var(--muted);background:#f4f4f5;border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+  .mono-badge{font-family:var(--mono);font-size:10.5px}
+  .check{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--muted);line-height:1.4;margin:2px 0 4px}
+  .check input{margin-top:3px;accent-color:var(--fg)}
   .empty-tray{text-align:center;padding:26px 16px;color:var(--muted-2);font-size:13px}
 
   .receipt-card.remote{cursor:default;background:#fcfcfc}
@@ -450,6 +453,11 @@
               <button class="btn-ghost" id="btn-signout" style="color:var(--danger);font-size:13px;padding:0">Sign out</button>
             </div>
             <div class="setup-status" id="setup-status"></div>
+            <div class="kv">
+              <button class="btn-ghost" id="btn-backfill" style="color:var(--link);font-weight:600;font-size:13px;padding:0">Backfill invoice numbers from stored PDFs</button>
+              <span></span>
+            </div>
+            <div class="setup-status" id="backfill-status"></div>
           </div>
         </div>
       </div>
@@ -506,7 +514,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.0</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.1</span></div>
         </div>
       </div>
     </section>
@@ -610,6 +618,10 @@
     <label for="f-merchant">Merchant</label>
     <input class="input" id="f-merchant" type="text">
   </div>
+  <div class="field">
+    <label for="f-invoice">Invoice No</label>
+    <input class="input mono" id="f-invoice" type="text" placeholder="As printed on the receipt" autocomplete="off" spellcheck="false">
+  </div>
   <div class="frow">
     <div class="field">
       <label for="f-date">Date</label>
@@ -671,6 +683,10 @@
     <label for="e-merchant">Merchant</label>
     <input class="input" id="e-merchant" type="text">
   </div>
+  <div class="field">
+    <label for="e-invoice">Invoice No</label>
+    <input class="input mono" id="e-invoice" type="text" autocomplete="off" spellcheck="false">
+  </div>
   <div class="frow">
     <div class="field">
       <label for="e-date">Date</label>
@@ -689,6 +705,7 @@
     <label for="e-other">Describe the purpose</label>
     <input class="input" id="e-other" type="text">
   </div>
+  <label class="check" id="e-movepdf-wrap"><input type="checkbox" id="e-movepdf" checked><span>Also move and rename the PDF in OneDrive to match the corrected date, merchant and amount</span></label>
   <div class="sheet-actions">
     <button class="btn btn-outline" id="btn-edit-cancel">Cancel</button>
     <button class="btn btn-primary" id="btn-edit-save">Save changes</button>
@@ -729,8 +746,12 @@
   const SCOPES = ['User.Read','Files.ReadWrite'];
   const WB_NAME = 'Claims.xlsx';
   const TABLE = 'Claims';
+  // Columns are addressed by header name, not position, so the user may add
+  // or reorder their own columns without breaking the app.
+  const COLS = {date:'Date', merchant:'Merchant', purpose:'Purpose', amount:'Amount (RM)', pdf:'Receipt PDF', scanned:'Scanned on', invoice:'Invoice No'};
+  const DEFAULT_COLS = [COLS.date, COLS.merchant, COLS.purpose, COLS.amount, COLS.pdf, COLS.scanned, COLS.invoice];
   const DEFAULT_LABELS = ['Meals','Parking','Toll','Client entertainment','Client gifts','Travel','Accommodation','Hardware','Software'];
-  const CLAIMS_XLSX_B64 = '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';
+  const CLAIMS_XLSX_B64 = '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';
 
   const S = {
     get(k, d){ try{ const v = localStorage.getItem('rs.'+k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
@@ -1004,6 +1025,37 @@
   }
 
   /* =============== workbook bootstrap =============== */
+  let colNames = S.get('colNames', null) || DEFAULT_COLS.slice();
+  function colKeyOf(name){
+    const n = String(name||'').trim().toLowerCase();
+    for(const k in COLS) if(COLS[k].toLowerCase()===n) return k;
+    return null;
+  }
+  function colIndex(key){ return colNames.findIndex(n=>colKeyOf(n)===key); }
+  async function loadColumns(){
+    const res = await graph('/me/drive/root:'+encPath(basePath()+'/'+WB_NAME)+":/workbook/tables('"+TABLE+"')/columns?$select=name,index");
+    if(!res.ok) throw new Error('Could not read table columns ('+res.status+')');
+    const cols = (((await res.json()).value)||[]).sort((a,b)=>a.index-b.index).map(c=>c.name);
+    if(cols.length){ colNames = cols; S.set('colNames', cols); }
+    return colNames;
+  }
+  function rowToRecord(vals, idx){
+    const rec = {idx:(idx===undefined||idx===null)?null:idx, raw:vals.slice()};
+    for(const k in COLS){
+      const i = colIndex(k);
+      rec[k] = (i>=0 && i<vals.length && vals[i]!==null) ? vals[i] : '';
+    }
+    return rec;
+  }
+  function recordToValues(rec, raw){
+    // Known columns from the record; the user's own columns keep their values.
+    return colNames.map((n,i)=>{
+      const k = colKeyOf(n);
+      if(k) return (rec[k]===undefined||rec[k]===null) ? '' : rec[k];
+      return (raw && raw[i]!==undefined && raw[i]!==null) ? raw[i] : '';
+    });
+  }
+
   function b64ToBlob(b64, mime){
     const bin = atob(b64);
     const bytes = new Uint8Array(bin.length);
@@ -1047,6 +1099,19 @@
       }
     }else if(!t.ok){
       throw new Error('Could not read the Claims table ('+t.status+'). If '+WB_NAME+' is damaged, delete it in OneDrive and run Check storage setup again.');
+    }
+    // Column migration: older workbooks lack "Invoice No"; add it at the end.
+    await loadColumns();
+    if(colIndex('invoice') < 0){
+      const add = await graph(wb+":/workbook/tables('"+TABLE+"')/columns/add", {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: COLS.invoice})
+      });
+      if(!add.ok){
+        const err = await add.json().catch(()=>({}));
+        throw new Error('Could not add the Invoice No column: '+((err.error&&err.error.message)||add.status));
+      }
+      await loadColumns();
     }
     return created ? 'created' : 'exists';
   }
@@ -1094,7 +1159,7 @@
   }
 
   /* =============== Claude extraction =============== */
-  const PROMPT = 'Read this receipt photo. If more than one image is provided, they are sequential segments of the SAME single receipt, ordered top to bottom. This is a Malaysian receipt: dates are written day/month/year, so 11/09/2026 means 11 September 2026. Never interpret a date as month/day/year. Respond with ONLY a JSON object, no markdown, no explanation: {"merchant": string (business name in proper case), "date": "YYYY-MM-DD" or null if unreadable, "total": number (the final amount actually paid, after tax, service charge and rounding) or null, "currency": ISO 4217 code string, "confidence": "high" or "low", "reason": string (only when confidence is low, one short sentence why)}';
+  const PROMPT = 'Read this receipt photo. If more than one image is provided, they are sequential segments of the SAME single receipt, ordered top to bottom. This is a Malaysian receipt: dates are written day/month/year, so 11/09/2026 means 11 September 2026. Never interpret a date as month/day/year. Respond with ONLY a JSON object, no markdown, no explanation: {"merchant": string (business name in proper case), "date": "YYYY-MM-DD" or null if unreadable, "invoice": string (the invoice, receipt or order number exactly as printed) or null, "total": number (the final amount actually paid, after tax, service charge and rounding) or null, "currency": ISO 4217 code string, "confidence": "high" or "low", "reason": string (only when confidence is low, one short sentence why)}';
 
   async function extract(receipt){
     const key = S.get('apiKey','');
@@ -1147,7 +1212,7 @@
     const r = {
       id: nextId++,
       uid: Math.random().toString(36).slice(2,8),
-      merchant:'', amount:null, dateISO: todayISO(),
+      merchant:'', invoice:'', amount:null, dateISO: todayISO(),
       purpose:null, other:'',
       flag:false, flagReason:'',
       status:'reading',
@@ -1189,6 +1254,7 @@
     try{
       const out = await extract(r);
       r.merchant = (out.merchant||'').trim() || 'Unknown merchant';
+      r.invoice = (out.invoice===null||out.invoice===undefined) ? '' : String(out.invoice).trim();
       r.amount = (typeof out.total==='number' && out.total>0) ? out.total : null;
       const sd = saneDate(out.date);
       r.dateISO = sd.iso;
@@ -2063,6 +2129,7 @@
     $('#sheet-warn').style.display = r.flag ? 'flex':'none';
     $('#sheet-warn-text').textContent = r.flagReason || 'Double-check the details against the paper copy.';
     $('#f-merchant').value = r.merchant;
+    $('#f-invoice').value = r.invoice || '';
     $('#f-date').value = r.dateISO;
     $('#f-amount').value = r.amount===null ? '' : Number(r.amount).toFixed(2);
     renderChips(r.purpose);
@@ -2106,6 +2173,7 @@
     if(!(amt>0)){ toast('Amount must be above zero'); return; }
     if(sel.dataset.p==='Others' && !$('#f-other').value.trim()){ toast('Describe the purpose for Others'); return; }
     r.merchant = $('#f-merchant').value.trim() || 'Unknown merchant';
+    r.invoice = $('#f-invoice').value.trim();
     r.dateISO = $('#f-date').value || r.dateISO;
     r.amount = Math.round(amt*100)/100;
     r.purpose = sel.dataset.p;
@@ -2192,7 +2260,7 @@
     const uploaded = await uploadPdf(pdfBlob, basePath()+'/'+ym+'/'+fname);
     if(onStep) onStep(2);
     const purposeText = r.purpose==='Others' ? r.other : r.purpose;
-    await appendRow([r.dateISO, r.merchant, purposeText, r.amount, (uploaded&&uploaded.webUrl)||'', nowStamp()]);
+    await appendRow(recordToValues({date:r.dateISO, merchant:r.merchant, purpose:purposeText, amount:r.amount, pdf:(uploaded&&uploaded.webUrl)||'', scanned:nowStamp(), invoice:r.invoice||''}, null));
     return uploaded;
   }
 
@@ -2289,10 +2357,15 @@
 
   /* =============== history (from Excel) =============== */
   let historyRows = S.get('historyCache', []);
+  // migrate caches from older builds that stored positional arrays
+  if(historyRows.length && Array.isArray(historyRows[0])){
+    historyRows = historyRows.map(a=>({date:a[0], merchant:a[1], purpose:a[2], amount:a[3], pdf:a[4]||'', scanned:a[5]||'', invoice:'', idx:null, raw:null}));
+    S.set('historyCache', historyRows);
+  }
 
   function appendLocalHistory(receipts){
     receipts.forEach(r=>{
-      historyRows.push([r.dateISO, r.merchant, r.purpose==='Others'?r.other:r.purpose, r.amount, '', nowStamp()]);
+      historyRows.push({date:r.dateISO, merchant:r.merchant, purpose:r.purpose==='Others'?r.other:r.purpose, amount:r.amount, pdf:'', scanned:nowStamp(), invoice:r.invoice||'', idx:null, raw:null});
     });
     S.set('historyCache', historyRows);
     renderHistory();
@@ -2316,14 +2389,12 @@
       if(res.status===404){ renderHistory(); renderMonthChart(); return; }
       if(!res.ok) throw new Error('Could not load history ('+res.status+')');
       const data = await res.json();
+      try{ await loadColumns(); }catch(e){}
       historyRows = (data.value||[])
-        .map(row=>{ const v = row.values[0]; if(Array.isArray(v)) v[6] = row.index; return v; })
-        .filter(r=>Array.isArray(r) && r.slice(0,6).some(c=>c!==null && c!==''))
-        .map(row=>{
-          const iso = rowDateISO(row[0]);
-          if(iso) row[0] = iso;
-          return row;
-        });
+        .filter(row=>Array.isArray(row.values) && Array.isArray(row.values[0]))
+        .map(row=>rowToRecord(row.values[0], row.index))
+        .filter(rec=>[rec.date, rec.merchant, rec.purpose, rec.amount].some(c=>c!==null && c!==''))
+        .map(rec=>{ const iso = rowDateISO(rec.date); if(iso) rec.date = iso; return rec; });
       S.set('historyCache', historyRows);
       renderHistory();
       renderMonthChart();
@@ -2362,21 +2433,22 @@
     const groups = {};
     const order = [];
     historyRows.map((row,i)=>({row,i})).reverse().forEach(({row,i})=>{
-      const key = monthKeyOf(row[0]);
+      const key = monthKeyOf(row.date);
       if(!groups[key]){ groups[key]=[]; order.push(key); }
       groups[key].push({row,i});
     });
     el.innerHTML = order.map(month=>{
       const rows = groups[month];
-      const total = rows.reduce((s,x)=>s+(parseFloat(x.row[3])||0),0);
+      const total = rows.reduce((s,x)=>s+(parseFloat(x.row.amount)||0),0);
       return '<div class="month-head"><h3>'+month+'</h3><span class="total">RM '+fmt(total)+'</span></div>'
         +'<div class="hist-group">'+rows.map(({row:r,i})=>{
-          const link = r[4] ? '<a class="pdf-link" href="'+esc(r[4])+'" target="_blank" rel="noopener" title="Open PDF in OneDrive"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>' : '';
-          const editable = r[6]!==undefined && r[6]!==null;
+          const link = r.pdf ? '<a class="pdf-link" href="'+esc(r.pdf)+'" target="_blank" rel="noopener" title="Open PDF in OneDrive"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>' : '';
+          const editable = r.idx!==undefined && r.idx!==null;
+          const inv = r.invoice ? '<span class="purpose-badge mono-badge">#'+esc(r.invoice)+'</span>' : '';
           return '<div class="hist-row'+(editable?' editable':'')+'" data-i="'+i+'">'
-            +'<div class="info"><div class="merchant">'+esc(r[1])+'</div>'
-            +'<div class="meta"><span>'+shortDate(r[0])+'</span><span class="purpose-badge">'+esc(r[2])+'</span></div></div>'
-            +'<div class="amount">RM '+fmt(parseFloat(r[3])||0)+'</div>'
+            +'<div class="info"><div class="merchant">'+esc(r.merchant)+'</div>'
+            +'<div class="meta"><span>'+shortDate(r.date)+'</span><span class="purpose-badge">'+esc(r.purpose)+'</span>'+inv+'</div></div>'
+            +'<div class="amount">RM '+fmt(parseFloat(r.amount)||0)+'</div>'
             + link
           +'</div>';
         }).join('')+'</div>';
@@ -2393,9 +2465,9 @@
     const key = monthKeyOf(todayISO());
     const agg = {};
     historyRows.forEach(r=>{
-      if(monthKeyOf(r[0])!==key) return;
-      const p = r[2]||'Unlabelled';
-      agg[p] = (agg[p]||0) + (parseFloat(r[3])||0);
+      if(monthKeyOf(r.date)!==key) return;
+      const p = r.purpose||'Unlabelled';
+      agg[p] = (agg[p]||0) + (parseFloat(r.amount)||0);
     });
     const entries = Object.entries(agg).sort((a,b)=>b[1]-a[1]);
     if(!entries.length){
@@ -2640,13 +2712,16 @@
   function openEditSheet(i){
     const row = historyRows[i];
     if(!row) return;
-    if(row[6]===undefined || row[6]===null){ toast('Tap Refresh first so this row can be edited'); return; }
+    if(row.idx===undefined || row.idx===null){ toast('Tap Refresh first so this row can be edited'); return; }
     editIdx = i;
-    const purpose = row[2] || '';
+    const purpose = row.purpose || '';
     const known = labels().includes(purpose) && purpose!=='Others';
-    $('#e-merchant').value = row[1] || '';
-    $('#e-date').value = rowDateISO(row[0]) || '';
-    $('#e-amount').value = (parseFloat(row[3])||0).toFixed(2);
+    $('#e-merchant').value = row.merchant || '';
+    $('#e-invoice').value = row.invoice || '';
+    $('#e-date').value = rowDateISO(row.date) || '';
+    $('#e-amount').value = (parseFloat(row.amount)||0).toFixed(2);
+    $('#e-movepdf').checked = true;
+    $('#e-movepdf-wrap').style.display = row.pdf ? 'flex' : 'none';
     renderChipsInto($('#e-chips'), known ? purpose : 'Others', v=>{
       $('#e-other-wrap').style.display = v==='Others' ? 'block' : 'none';
       if(v==='Others') $('#e-other').focus();
@@ -2690,28 +2765,162 @@
     if(!(amt>0)){ toast('Amount must be above zero'); return; }
     const purposeText = sel.dataset.p==='Others' ? $('#e-other').value.trim() : sel.dataset.p;
     if(!purposeText){ toast('Describe the purpose'); return; }
-    const values = [
-      $('#e-date').value || rowDateISO(row[0]) || todayISO(),
-      $('#e-merchant').value.trim() || row[1],
-      purposeText,
-      Math.round(amt*100)/100,
-      row[4] || '',
-      row[5] || ''
-    ];
+    const newRec = Object.assign({}, row, {
+      date: $('#e-date').value || rowDateISO(row.date) || todayISO(),
+      merchant: $('#e-merchant').value.trim() || row.merchant,
+      invoice: $('#e-invoice').value.trim(),
+      purpose: purposeText,
+      amount: Math.round(amt*100)/100
+    });
     const st = $('#edit-status');
-    st.className = 'setup-status'; st.textContent = 'Saving to '+WB_NAME+'…';
+    st.className = 'setup-status';
     $('#btn-edit-save').disabled = true;
+    let moveNote = '';
+    const detailsChanged = newRec.date!==rowDateISO(row.date) || newRec.merchant!==row.merchant || Number(newRec.amount)!==Number(row.amount);
     try{
-      await updateRow(row[6], values);
-      row[0] = values[0]; row[1] = values[1]; row[2] = values[2]; row[3] = values[3];
+      if($('#e-movepdf').checked && row.pdf && detailsChanged){
+        st.textContent = 'Moving and renaming the PDF…';
+        try{ newRec.pdf = await movePdf(row, newRec); }
+        catch(e){ moveNote = ' PDF could not be moved ('+e.message+'); the row was saved with the old link.'; }
+      }
+      st.textContent = 'Saving to '+WB_NAME+'…';
+      await updateRow(row.idx, recordToValues(newRec, row.raw));
+      Object.assign(row, newRec);
       S.set('historyCache', historyRows);
       renderHistory(); renderMonthChart();
-      toast('Receipt updated in '+WB_NAME);
-      closeEditSheet();
+      toast('Receipt updated in '+WB_NAME+(moveNote?' (see note)':''));
+      if(moveNote){ st.className = 'setup-status bad'; st.textContent = moveNote.trim(); $('#btn-edit-save').disabled = false; }
+      else closeEditSheet();
     }catch(e){
       st.className = 'setup-status bad'; st.textContent = e.message;
       $('#btn-edit-save').disabled = false;
     }
+  });
+
+  /* ---- OneDrive file helpers for edits and backfill ---- */
+  async function listMonthFolders(){
+    const res = await graph('/me/drive/root:'+encPath(basePath())+':/children?$select=name,folder&$top=200');
+    if(!res.ok) return [];
+    return (((await res.json()).value)||[]).filter(c=>c.folder && /^\d{4}-\d{2}$/.test(c.name)).map(c=>c.name).sort().reverse();
+  }
+  async function buildPdfIndex(){
+    // url -> drive item, across all month folders
+    const map = {};
+    for(const f of await listMonthFolders()){
+      const r = await graph('/me/drive/root:'+encPath(basePath()+'/'+f)+':/children?$select=id,name,webUrl&$top=500');
+      if(!r.ok) continue;
+      (((await r.json()).value)||[]).forEach(it=>{ if(it.webUrl) map[it.webUrl] = it; });
+    }
+    return map;
+  }
+  async function findItemByUrl(url, dateISO){
+    const ym = (rowDateISO(dateISO)||'').slice(0,7);
+    const folders = await listMonthFolders();
+    if(ym && !folders.includes(ym)) folders.unshift(ym);
+    else if(ym){ folders.splice(folders.indexOf(ym),1); folders.unshift(ym); }
+    for(const f of folders){
+      const r = await graph('/me/drive/root:'+encPath(basePath()+'/'+f)+':/children?$select=id,name,webUrl&$top=500');
+      if(!r.ok) continue;
+      const hit = (((await r.json()).value)||[]).find(it=>it.webUrl===url);
+      if(hit) return hit;
+    }
+    return null;
+  }
+  async function ensureFolder(path){
+    const r = await graph('/me/drive/root:'+encPath(path));
+    if(r.ok) return;
+    const parent = path.slice(0, path.lastIndexOf('/'));
+    const name = path.slice(path.lastIndexOf('/')+1);
+    const c = await graph('/me/drive/root:'+encPath(parent)+':/children', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, folder:{}, '@microsoft.graph.conflictBehavior':'fail'})
+    });
+    if(!c.ok && c.status!==409) throw new Error('Could not create folder '+path);
+  }
+  async function movePdf(rec, newRec){
+    const item = await findItemByUrl(rec.pdf, rec.date);
+    if(!item) throw new Error('PDF not found in OneDrive by its link');
+    const m = /_([a-z0-9]{6})\.pdf$/i.exec(item.name);
+    const uid = m ? m[1] : Math.random().toString(36).slice(2,8);
+    const newName = newRec.date+'_'+sanitizeName(newRec.merchant)+'_RM'+Number(newRec.amount).toFixed(2)+'_'+uid+'.pdf';
+    const folder = basePath()+'/'+newRec.date.slice(0,7);
+    await ensureFolder(folder);
+    const res = await graph('/me/drive/items/'+item.id, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:newName, parentReference:{path:'/drive/root:'+folder}})
+    });
+    if(!res.ok){
+      const e = await res.json().catch(()=>({}));
+      throw new Error((e.error&&e.error.message)||('status '+res.status));
+    }
+    const moved = await res.json();
+    return moved.webUrl || rec.pdf;
+  }
+
+  /* ---- backfill invoice numbers from stored PDFs ---- */
+  function bufToB64(buf){
+    const bytes = new Uint8Array(buf); let s = '';
+    for(let i=0; i<bytes.length; i+=0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i+0x8000));
+    return btoa(s);
+  }
+  async function invoiceFromPdf(b64){
+    const key = S.get('apiKey','');
+    if(!key) throw new Error('Anthropic API key missing (Settings)');
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({
+        model: S.get('model','claude-sonnet-4-6'), max_tokens: 120,
+        messages:[{role:'user', content:[
+          {type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}},
+          {type:'text', text:'This is a Malaysian receipt. Respond with ONLY JSON, no markdown: {"invoice": string (the invoice, receipt or order number exactly as printed) or null}'}
+        ]}]
+      })
+    });
+    if(!res.ok){ const err = await res.json().catch(()=>({})); throw new Error((err.error&&err.error.message)||('API '+res.status)); }
+    const data = await res.json();
+    const text = (data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('');
+    const out = JSON.parse(text.replace(/```json|```/g,'').trim());
+    return (out.invoice===null||out.invoice===undefined) ? '' : String(out.invoice).trim();
+  }
+  let backfilling = false;
+  $('#btn-backfill').addEventListener('click', async ()=>{
+    if(backfilling) return;
+    const st = $('#backfill-status');
+    if(!account || !isOnline()){ st.className='setup-status bad'; st.textContent='Sign in and be online to backfill.'; return; }
+    backfilling = true; st.className = 'setup-status';
+    try{
+      st.textContent = 'Checking workbook…';
+      await ensureWorkbook();
+      await loadHistory(true);
+      const targets = historyRows.filter(r=>r.idx!==null && r.idx!==undefined && !r.invoice && r.pdf);
+      if(!targets.length){ st.className='setup-status ok'; st.textContent='Every filed receipt already has an invoice number.'; backfilling=false; return; }
+      st.textContent = 'Locating '+targets.length+' PDF'+(targets.length>1?'s':'')+' in OneDrive…';
+      const index = await buildPdfIndex();
+      let done = 0, filled = 0, missing = 0, blank = 0;
+      for(const r of targets){
+        done++;
+        st.textContent = 'Reading receipt '+done+' of '+targets.length+'… ('+filled+' filled)';
+        const item = index[r.pdf];
+        if(!item){ missing++; continue; }
+        try{
+          const dl = await graph('/me/drive/items/'+item.id+'/content');
+          if(!dl.ok) { missing++; continue; }
+          const inv = await invoiceFromPdf(bufToB64(await dl.arrayBuffer()));
+          if(!inv){ blank++; continue; }
+          await updateRow(r.idx, recordToValues(Object.assign({}, r, {invoice:inv}), r.raw));
+          r.invoice = inv; filled++;
+          S.set('historyCache', historyRows);
+        }catch(e){ blank++; }
+      }
+      renderHistory();
+      st.className = 'setup-status ok';
+      st.textContent = 'Filled '+filled+' of '+targets.length+'.'
+        +(blank?' '+blank+' had no readable number.':'')
+        +(missing?' '+missing+' PDF'+(missing>1?'s':'')+' could not be located.':'')
+        +((blank||missing)?' Add those by tapping the row in History.':'');
+    }catch(e){ st.className='setup-status bad'; st.textContent = e.message; }
+    backfilling = false;
   });
 
   /* =============== purge / reset =============== */
