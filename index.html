@@ -122,6 +122,40 @@
   .mc-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
   .mc-head h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
   .mc-total{font-family:var(--mono);font-size:13px;font-weight:600}
+  /* 12-month stacked chart card */
+  .chart-card{width:100%;text-align:left;background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px 16px 12px;margin-top:26px;transition:border-color .15s}
+  .chart-card:hover{border-color:var(--border-strong)}
+  .cc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
+  .cc-kicker{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .cc-total{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:3px}
+  .cc-sub{font-size:12px;color:var(--muted);text-align:right;line-height:1.4;padding-top:2px}
+  .cc-sub b{font-family:var(--mono);font-weight:600;color:var(--fg)}
+  .stack-svg{width:100%;height:auto;display:block}
+  .cc-legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:10px}
+  .cc-legend span{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+  .cc-legend i{width:8px;height:8px;border-radius:2px;display:inline-block}
+  .cc-hint{font-size:11px;color:var(--muted-2);margin-top:10px;text-align:right}
+  .cc-empty{font-size:13px;color:var(--muted-2);text-align:center;padding:18px 0 10px}
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+  .stat{background:#fafafa;border:1px solid var(--border);border-radius:var(--r-md);padding:10px 10px}
+  .stat .k{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-family:var(--mono);font-size:14px;font-weight:600;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stat .s{font-size:11px;color:var(--muted);margin-top:2px}
+  .sm-list{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-top:14px}
+  .sm-row{width:100%;text-align:left;display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--card)}
+  .sm-row:last-child{border-bottom:none}
+  .sm-row .m{flex:1;font-size:14px;font-weight:600}
+  .sm-row .m small{display:block;font-size:11.5px;color:var(--muted);font-weight:500;margin-top:1px}
+  .sm-row .t{font-family:var(--mono);font-size:13.5px;font-weight:600}
+  .sm-row .chev{transition:transform .15s}
+  .sm-row.open .chev{transform:rotate(90deg)}
+  .sm-detail{display:none;padding:6px 14px 14px;background:#fafafa;border-bottom:1px solid var(--border)}
+  .sm-detail.show{display:block}
+  .sm-detail .bar-row{margin-bottom:9px}
+  .pdf-preview{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:#f4f4f5;margin-bottom:16px;min-height:110px;display:flex;align-items:center;justify-content:center;position:relative}
+  .pdf-preview img{width:100%;display:block;max-height:46vh;object-fit:contain;background:#fff;cursor:zoom-in}
+  .pdf-preview-ph{font-size:12.5px;color:var(--muted-2);padding:22px 12px;text-align:center}
+  .pdf-preview .open-tag{position:absolute;right:8px;bottom:8px;font-size:10.5px;font-weight:600;color:#fff;background:rgba(24,24,27,.6);padding:3px 8px;border-radius:999px;pointer-events:none}
   .bar-row{display:grid;grid-template-columns:118px 1fr auto;gap:10px;align-items:center;margin-bottom:11px}
   .bar-row:last-child{margin-bottom:0}
   .bar-row .bl{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -410,13 +444,18 @@
       </div>
       <div id="remote-list"></div>
 
-      <div class="month-card">
-        <div class="mc-head">
-          <h3>Filed this month</h3>
-          <span class="mc-total" id="mc-total"></span>
+      <button class="chart-card" id="chart-card" type="button" aria-label="Claims over the last 12 months, tap for breakdown">
+        <div class="cc-head">
+          <div>
+            <div class="cc-kicker">Claims · last 12 months</div>
+            <div class="cc-total" id="cc-total">RM 0.00</div>
+          </div>
+          <div class="cc-sub" id="cc-sub"></div>
         </div>
-        <div id="mc-bars"></div>
-      </div>
+        <div id="cc-svg"></div>
+        <div class="cc-legend" id="cc-legend"></div>
+        <div class="cc-hint">Tap for the monthly breakdown</div>
+      </button>
     </section>
 
     <!-- ============ SETTINGS ============ -->
@@ -514,7 +553,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.1</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.2</span></div>
         </div>
       </div>
     </section>
@@ -679,6 +718,11 @@
       <p>Changes are written straight into Claims.xlsx. The PDF stays as it is.</p>
     </div>
   </div>
+  <div class="pdf-preview" id="e-preview">
+    <div class="pdf-preview-ph" id="e-preview-ph">Loading preview…</div>
+    <img id="e-preview-img" alt="Receipt PDF preview" style="display:none">
+    <span class="open-tag" id="e-preview-tag" style="display:none">Tap to open PDF</span>
+  </div>
   <div class="field">
     <label for="e-merchant">Merchant</label>
     <input class="input" id="e-merchant" type="text">
@@ -711,6 +755,18 @@
     <button class="btn btn-primary" id="btn-edit-save">Save changes</button>
   </div>
   <div class="setup-status" id="edit-status"></div>
+</div>
+
+<!-- claims breakdown sheet -->
+<div class="sheet" id="stats-sheet" role="dialog" aria-modal="true" aria-label="Claims breakdown">
+  <div class="grab"></div>
+  <div class="sheet-head">
+    <div class="t">
+      <h2>Claims breakdown</h2>
+      <p>Last 12 months, from Claims.xlsx. Tap a month to see its composition.</p>
+    </div>
+  </div>
+  <div id="stats-body"></div>
 </div>
 
 <!-- submit progress overlay -->
@@ -2143,7 +2199,7 @@
     $('#sheet').classList.remove('show');
     activeId = null;
   }
-  $('#scrim').addEventListener('click', ()=>{ closeSheet(); closePurge(); closeEditSheet(); });
+  $('#scrim').addEventListener('click', ()=>{ closeSheet(); closePurge(); closeEditSheet(); closeStats(); });
   $('#btn-photo-toggle').addEventListener('click', ()=>{
     const p = $('#full-photos');
     p.classList.toggle('show');
@@ -2261,6 +2317,7 @@
     if(onStep) onStep(2);
     const purposeText = r.purpose==='Others' ? r.other : r.purpose;
     await appendRow(recordToValues({date:r.dateISO, merchant:r.merchant, purpose:purposeText, amount:r.amount, pdf:(uploaded&&uploaded.webUrl)||'', scanned:nowStamp(), invoice:r.invoice||''}, null));
+    pdfIndex = null;
     return uploaded;
   }
 
@@ -2461,29 +2518,129 @@
     });
   }
 
-  function renderMonthChart(){
-    const key = monthKeyOf(todayISO());
-    const agg = {};
+  /* =============== 12-month stacked chart & breakdown =============== */
+  const PALETTE = ['#18181b','#2563eb','#059669','#d97706','#7c3aed','#dc2626','#0891b2','#db2777','#65a30d','#3f3f46'];
+  const OTHERS_COLOR = '#a1a1aa';
+
+  function purposeBucket(p){
+    const known = labels().filter(l=>l!=='Others');
+    return known.includes(p) ? p : 'Others';
+  }
+
+  function monthsData(){
+    const now = new Date();
+    const months = [];
+    for(let i=11; i>=0; i--){
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      months.push({key, label:d.toLocaleDateString('en-GB',{month:'short'}), long:d.toLocaleDateString('en-GB',{month:'long',year:'numeric'}), total:0, byPurpose:{}, count:0});
+    }
+    const byKey = {};
+    months.forEach(m=>byKey[m.key]=m);
     historyRows.forEach(r=>{
-      if(monthKeyOf(r.date)!==key) return;
-      const p = r.purpose||'Unlabelled';
-      agg[p] = (agg[p]||0) + (parseFloat(r.amount)||0);
+      const iso = rowDateISO(r.date); if(!iso) return;
+      const m = byKey[iso.slice(0,7)]; if(!m) return;
+      const amt = parseFloat(r.amount)||0;
+      const p = purposeBucket(r.purpose||'Others');
+      m.total += amt; m.count++;
+      m.byPurpose[p] = (m.byPurpose[p]||0) + amt;
     });
-    const entries = Object.entries(agg).sort((a,b)=>b[1]-a[1]);
-    if(!entries.length){
-      $('#mc-total').textContent = '';
-      $('#mc-bars').innerHTML = '<div class="mc-empty">Nothing filed yet this month.</div>';
+    const totals = {};
+    months.forEach(m=>Object.keys(m.byPurpose).forEach(p=>{ totals[p]=(totals[p]||0)+m.byPurpose[p]; }));
+    const ranked = Object.keys(totals).filter(p=>p!=='Others').sort((a,b)=>totals[b]-totals[a]);
+    const colors = {};
+    ranked.forEach((p,i)=>{ colors[p] = PALETTE[i % PALETTE.length]; });
+    if(totals.Others) colors.Others = OTHERS_COLOR;
+    if(totals.Others) ranked.push('Others');
+    return {months, colors, ranked, totals};
+  }
+
+  function buildStackSvg(months, colors, W, H){
+    const padL = 4, padR = 4, padT = 8, padB = 20;
+    const n = months.length;
+    const max = Math.max(1, Math.max.apply(null, months.map(m=>m.total)));
+    const bw = (W-padL-padR)/n;
+    const gap = Math.max(4, bw*0.3), barW = bw-gap;
+    const plotH = H-padT-padB;
+    let s = '<svg viewBox="0 0 '+W+' '+H+'" class="stack-svg" xmlns="http://www.w3.org/2000/svg" role="img">';
+    s += '<line x1="'+padL+'" y1="'+(H-padB)+'" x2="'+(W-padR)+'" y2="'+(H-padB)+'" stroke="#e4e4e7" stroke-width="1"/>';
+    months.forEach((m,i)=>{
+      const x = padL + i*bw + gap/2;
+      let y = H-padB;
+      if(m.total>0){
+        const order = Object.keys(m.byPurpose).sort((a,b)=>m.byPurpose[b]-m.byPurpose[a]);
+        order.forEach(p=>{
+          const hh = Math.max(1.2, (m.byPurpose[p]/max)*plotH);
+          y -= hh;
+          s += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+hh.toFixed(1)+'" fill="'+(colors[p]||OTHERS_COLOR)+'"/>';
+        });
+      }else{
+        s += '<rect x="'+x.toFixed(1)+'" y="'+(H-padB-2)+'" width="'+barW.toFixed(1)+'" height="2" fill="#e4e4e7"/>';
+      }
+      s += '<text x="'+(x+barW/2).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="8.5" font-family="Geist, sans-serif" fill="#a1a1aa">'+m.label+'</text>';
+    });
+    return s+'</svg>';
+  }
+
+  function renderMonthChart(){
+    const data = monthsData();
+    const total12 = data.months.reduce((s,m)=>s+m.total,0);
+    const cur = data.months[data.months.length-1];
+    $('#cc-total').textContent = 'RM '+fmt(total12);
+    $('#cc-sub').innerHTML = 'This month <b>RM '+fmt(cur.total)+'</b><br>'+cur.count+' receipt'+(cur.count===1?'':'s');
+    if(total12===0){
+      $('#cc-svg').innerHTML = '<div class="cc-empty">Nothing filed in the last 12 months yet.</div>';
+      $('#cc-legend').innerHTML = '';
       return;
     }
-    const total = entries.reduce((s,e)=>s+e[1],0);
-    const max = entries[0][1];
-    $('#mc-total').textContent = 'RM '+fmt(total);
-    $('#mc-bars').innerHTML = entries.map(([p,v])=>
-      '<div class="bar-row"><span class="bl">'+esc(p)+'</span>'
-      +'<span class="bar-track"><span class="bar-fill" style="width:'+Math.max(4, v/max*100)+'%"></span></span>'
-      +'<span class="bv">'+fmt(v)+'</span></div>'
-    ).join('');
+    $('#cc-svg').innerHTML = buildStackSvg(data.months, data.colors, 340, 150);
+    $('#cc-legend').innerHTML = data.ranked.slice(0,6).map(p=>'<span><i style="background:'+data.colors[p]+'"></i>'+esc(p)+'</span>').join('')
+      + (data.ranked.length>6 ? '<span style="color:var(--muted-2)">+'+(data.ranked.length-6)+' more</span>' : '');
   }
+
+  function openStats(){
+    const data = monthsData();
+    const total12 = data.months.reduce((s,m)=>s+m.total,0);
+    const active = data.months.filter(m=>m.total>0).length;
+    const avg = active ? total12/active : 0;
+    const top = data.months.reduce((a,b)=>b.total>a.total?b:a, data.months[0]);
+    const body = $('#stats-body');
+    let html = '<div class="stat-grid">'
+      +'<div class="stat"><div class="k">12 months</div><div class="v">RM '+fmt(total12)+'</div><div class="s">'+data.months.reduce((s,m)=>s+m.count,0)+' receipts</div></div>'
+      +'<div class="stat"><div class="k">Avg / month</div><div class="v">RM '+fmt(avg)+'</div><div class="s">across '+active+' active</div></div>'
+      +'<div class="stat"><div class="k">Highest</div><div class="v">RM '+fmt(top.total)+'</div><div class="s">'+top.label+'</div></div>'
+      +'</div>';
+    if(total12>0){
+      html += buildStackSvg(data.months, data.colors, 340, 190);
+      html += '<div class="cc-legend">'+data.ranked.map(p=>'<span><i style="background:'+data.colors[p]+'"></i>'+esc(p)+' · <span class="mono-badge">'+fmt(data.totals[p])+'</span></span>').join('')+'</div>';
+    }
+    html += '<div class="sm-list">'+data.months.slice().reverse().map((m,i)=>{
+      const order = Object.keys(m.byPurpose).sort((a,b)=>m.byPurpose[b]-m.byPurpose[a]);
+      const maxP = order.length ? m.byPurpose[order[0]] : 1;
+      const detail = order.length ? order.map(p=>
+        '<div class="bar-row"><span class="bl"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+(data.colors[p]||OTHERS_COLOR)+';margin-right:6px;vertical-align:middle"></i>'+esc(p)+'</span>'
+        +'<span class="bar-track"><span class="bar-fill" style="width:'+Math.max(4, m.byPurpose[p]/maxP*100)+'%;background:'+(data.colors[p]||OTHERS_COLOR)+'"></span></span>'
+        +'<span class="bv">'+fmt(m.byPurpose[p])+'</span></div>'
+      ).join('') : '<div class="mc-empty">No receipts filed this month.</div>';
+      return '<button class="sm-row'+(i===0?' open':'')+'" type="button" data-k="'+m.key+'"><span class="m">'+m.long+'<small>'+m.count+' receipt'+(m.count===1?'':'s')+'</small></span><span class="t">RM '+fmt(m.total)+'</span>'
+        +'<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>'
+        +'<div class="sm-detail'+(i===0?' show':'')+'">'+detail+'</div>';
+    }).join('')+'</div>';
+    body.innerHTML = html;
+    body.querySelectorAll('.sm-row').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        btn.classList.toggle('open');
+        btn.nextElementSibling.classList.toggle('show');
+      });
+    });
+    $('#scrim').classList.add('show');
+    $('#stats-sheet').classList.add('show');
+  }
+  function closeStats(){
+    $('#stats-sheet').classList.remove('show');
+    if(!$('#sheet').classList.contains('show') && !$('#purge-sheet').classList.contains('show') && !$('#edit-sheet').classList.contains('show')) $('#scrim').classList.remove('show');
+  }
+  $('#chart-card').addEventListener('click', openStats);
 
   /* =============== tabs =============== */
   const TB = {
@@ -2722,6 +2879,7 @@
     $('#e-amount').value = (parseFloat(row.amount)||0).toFixed(2);
     $('#e-movepdf').checked = true;
     $('#e-movepdf-wrap').style.display = row.pdf ? 'flex' : 'none';
+    loadPdfPreview(row);
     renderChipsInto($('#e-chips'), known ? purpose : 'Others', v=>{
       $('#e-other-wrap').style.display = v==='Others' ? 'block' : 'none';
       if(v==='Others') $('#e-other').focus();
@@ -2797,6 +2955,41 @@
     }
   });
 
+  /* ---- PDF preview via OneDrive thumbnails (no download) ---- */
+  let pdfIndex = null, previewToken = 0;
+  async function getPdfIndex(force){
+    if(pdfIndex && !force) return pdfIndex;
+    pdfIndex = await buildPdfIndex();
+    return pdfIndex;
+  }
+  async function loadPdfPreview(row){
+    const wrap = $('#e-preview'), ph = $('#e-preview-ph'), img = $('#e-preview-img'), tag = $('#e-preview-tag');
+    img.style.display = 'none'; img.removeAttribute('src'); tag.style.display = 'none';
+    ph.style.display = 'block'; ph.textContent = 'Loading preview…';
+    wrap.style.display = row.pdf ? 'flex' : 'none';
+    if(!row.pdf) return;
+    if(!isOnline()){ ph.textContent = 'Preview needs a connection'; return; }
+    const token = ++previewToken;
+    try{
+      let idx = await getPdfIndex(false), item = idx[row.pdf];
+      if(!item){ idx = await getPdfIndex(true); item = idx[row.pdf]; }
+      if(!item) throw new Error('PDF not located');
+      let url = null;
+      let r = await graph('/me/drive/items/'+item.id+'/thumbnails?select=c1200x1200');
+      if(r.ok){ const v = ((await r.json()).value)||[]; url = v[0] && v[0].c1200x1200 && v[0].c1200x1200.url; }
+      if(!url){ r = await graph('/me/drive/items/'+item.id+'/thumbnails/0/large'); if(r.ok) url = (await r.json()).url; }
+      if(!url) throw new Error('no preview available');
+      if(token !== previewToken) return;
+      img.onload = ()=>{ if(token !== previewToken) return; ph.style.display = 'none'; img.style.display = 'block'; tag.style.display = 'inline'; };
+      img.onerror = ()=>{ if(token === previewToken) ph.textContent = 'Preview unavailable'; };
+      img.src = url;
+    }catch(e){ if(token === previewToken) ph.textContent = 'Preview unavailable ('+e.message+')'; }
+  }
+  $('#e-preview-img').addEventListener('click', ()=>{
+    const row = editIdx!==null ? historyRows[editIdx] : null;
+    if(row && row.pdf) window.open(row.pdf, '_blank', 'noopener');
+  });
+
   /* ---- OneDrive file helpers for edits and backfill ---- */
   async function listMonthFolders(){
     const res = await graph('/me/drive/root:'+encPath(basePath())+':/children?$select=name,folder&$top=200');
@@ -2854,6 +3047,7 @@
       throw new Error((e.error&&e.error.message)||('status '+res.status));
     }
     const moved = await res.json();
+    pdfIndex = null;
     return moved.webUrl || rec.pdf;
   }
 
