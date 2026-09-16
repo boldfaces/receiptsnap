@@ -110,6 +110,13 @@
 
   .purpose-badge{font-size:11px;font-weight:500;color:var(--muted);background:#f4f4f5;border:1px solid var(--border);border-radius:5px;padding:1px 6px}
   .mono-badge{font-family:var(--mono);font-size:10.5px}
+  .b-nr{color:var(--warn);border-color:var(--warn-bd);background:var(--warn-bg)}
+  .b-req{color:#2563eb;border-color:#bfdbfe;background:#eff6ff}
+  .b-val{color:var(--success);border-color:var(--success-bd);background:var(--success-bg)}
+  .b-late{color:var(--danger);border-color:var(--danger-bd);background:var(--danger-bg)}
+  .lbl-opt{font-weight:400;color:var(--muted);font-size:11.5px;margin-left:4px}
+  .hfilter{margin:12px 0 4px}
+  .hfilter .chips .chip{font-size:12px;padding:6px 11px}
   .check{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--muted);line-height:1.4;margin:2px 0 4px}
   .check input{margin-top:3px;accent-color:var(--fg)}
   .empty-tray{text-align:center;padding:26px 16px;color:var(--muted-2);font-size:13px}
@@ -155,6 +162,8 @@
   .pdf-preview{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:#f4f4f5;margin-bottom:16px;min-height:110px;display:flex;align-items:center;justify-content:center;position:relative}
   .pdf-preview img{width:100%;display:block;max-height:46vh;object-fit:contain;background:#fff;cursor:zoom-in}
   .pdf-preview-ph{font-size:12.5px;color:var(--muted-2);padding:22px 12px;text-align:center}
+  .pick-row{display:block;width:100%;text-align:left;font-size:12px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--card);margin-bottom:6px;word-break:break-all}
+  .pick-row:hover{background:#f4f4f5}
   .pdf-preview .open-tag{position:absolute;right:8px;bottom:8px;font-size:10.5px;font-weight:600;color:#fff;background:rgba(24,24,27,.6);padding:3px 8px;border-radius:999px;pointer-events:none}
   .bar-row{display:grid;grid-template-columns:118px 1fr auto;gap:10px;align-items:center;margin-bottom:11px}
   .bar-row:last-child{margin-bottom:0}
@@ -356,6 +365,11 @@
   .crop-loupe.left{left:14px}
   .crop-loupe.right{right:14px}
   .crop-loupe canvas{display:block}
+  #enh-img{position:absolute;left:0;right:0;top:calc(76px + env(safe-area-inset-top));height:calc(100% - 76px - env(safe-area-inset-top) - 160px - env(safe-area-inset-bottom));width:100%;object-fit:contain;background:#0c0c0d}
+  .enh-seg{position:absolute;left:16px;right:16px;bottom:calc(98px + env(safe-area-inset-bottom));display:flex;gap:4px;background:rgba(255,255,255,.14);border-radius:12px;padding:4px;backdrop-filter:blur(6px)}
+  .enh-seg button{flex:1;padding:9px 6px;border-radius:9px;font-size:12.5px;font-weight:600;color:#fff}
+  .enh-seg button.on{background:#fff;color:#18181b}
+  .enh-seg button:disabled{opacity:.35}
   .cam-side{color:#fff;font-size:12px;font-weight:600;background:rgba(24,24,27,.55);border-radius:10px;padding:10px 12px;line-height:1.25;min-width:76px;backdrop-filter:blur(6px)}
   .cam-side.on{background:#fff;color:#18181b}
   .cam-count{color:rgba(255,255,255,.85);font-size:12px;margin-top:12px;font-weight:500;min-height:15px}
@@ -408,6 +422,10 @@
         <span id="sync-banner-text"></span>
         <button id="btn-sync-retry" style="display:none">Retry</button>
       </div>
+      <div class="banner" id="einv-banner" style="display:none;cursor:pointer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span id="einv-banner-text"></span>
+      </div>
       <div class="banner" id="setup-banner" style="display:none">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
         <span id="setup-banner-text"></span>
@@ -447,7 +465,7 @@
       <button class="chart-card" id="chart-card" type="button" aria-label="Claims over the last 12 months, tap for breakdown">
         <div class="cc-head">
           <div>
-            <div class="cc-kicker">Claims · last 12 months</div>
+            <div class="cc-kicker" id="cc-kicker">Claims · last 12 months</div>
             <div class="cc-total" id="cc-total">RM 0.00</div>
           </div>
           <div class="cc-sub" id="cc-sub"></div>
@@ -497,6 +515,11 @@
               <span></span>
             </div>
             <div class="setup-status" id="backfill-status"></div>
+            <div class="kv">
+              <button class="btn-ghost" id="btn-integrity" style="color:var(--link);font-weight:600;font-size:13px;padding:0">Check integrity (links, orphans, duplicates)</button>
+              <span></span>
+            </div>
+            <div class="setup-status" id="integrity-status"></div>
           </div>
         </div>
       </div>
@@ -514,6 +537,7 @@
             <div class="sel" id="sel-model"></div>
             <div class="help">Sonnet reads dates and faded thermal receipts far more reliably. Haiku is cheaper per scan if quality holds for your receipts.</div>
           </div>
+          <label class="check" style="margin-top:12px"><input type="checkbox" id="s-enhance"><span>Enhance after crop: flatten lighting and straighten curled receipts for a scanner-like PDF</span></label>
         </div>
       </div>
 
@@ -529,6 +553,26 @@
             <label for="s-device">Device name</label>
             <input class="input" id="s-device" type="text" spellcheck="false">
             <div class="help">Shown on other devices next to receipts scanned here, e.g. "Alexander's phone".</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-section">
+        <h3>Entities</h3>
+        <div class="set-card">
+          <div class="field">
+            <textarea class="input" id="s-entities" rows="2" spellcheck="false"></textarea>
+            <div class="help">Which company each receipt belongs to, comma-separated. With more than one, every receipt must be assigned before filing; History and the chart can filter by entity.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-section">
+        <h3>Tax treatment hints</h3>
+        <div class="set-card">
+          <div class="field">
+            <textarea class="input" id="s-taxmap" rows="6" spellcheck="false"></textarea>
+            <div class="help">One line per purpose, "Purpose = Treatment". Written into the Tax Treatment column as a hint for your accountant. These defaults are common Malaysian practice, not advice: confirm them with your accountant once, then they apply to every receipt.</div>
           </div>
         </div>
       </div>
@@ -553,7 +597,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.2</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.4</span></div>
         </div>
       </div>
     </section>
@@ -567,6 +611,11 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 .42-8.98 6 6 0 0 0-11.7 1.62A4 4 0 0 0 7 19h10.5z"/><path d="m9 15 2 2 4-4"/></svg>
         <span id="sync-label">Synced with /Receipts/Claims.xlsx</span>
         <button class="refresh" id="btn-refresh">Refresh</button>
+      </div>
+      <div class="hfilter">
+        <input class="input" id="h-search" type="search" placeholder="Search merchant, invoice, purpose, notes…" autocomplete="off">
+        <div class="chips" id="h-entity" style="margin-top:8px"></div>
+        <div class="chips" style="margin-top:8px"><button type="button" class="chip" id="h-einv">E-invoice pending</button></div>
       </div>
       <div id="history"></div>
     </section>
@@ -637,6 +686,20 @@
   </div>
 </div>
 
+<!-- enhance step -->
+<div class="cropview" id="enhanceview">
+  <img id="enh-img" alt="Enhanced receipt">
+  <div class="crop-top">
+    <div class="crop-title">Enhance</div>
+    <div class="crop-hint" id="enh-status">Flattening lighting…</div>
+  </div>
+  <div class="enh-seg" id="enh-seg"></div>
+  <div class="crop-bottom">
+    <button class="crop-btn" id="enh-back">Back</button>
+    <button class="crop-btn primary" id="enh-use">Use this</button>
+  </div>
+</div>
+
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Review receipt">
   <div class="grab"></div>
@@ -671,6 +734,10 @@
       <input class="input mono" id="f-amount" type="number" step="0.01" inputmode="decimal">
     </div>
   </div>
+  <div class="field" id="f-entity-wrap">
+    <label>Entity</label>
+    <div class="chips" id="f-entity"></div>
+  </div>
   <div class="field">
     <label>Purpose</label>
     <div class="chips" id="f-chips"></div>
@@ -678,6 +745,18 @@
   <div class="field" id="f-other-wrap" style="display:none">
     <label for="f-other">Describe the purpose</label>
     <input class="input" id="f-other" type="text" placeholder="e.g. Printer ink for office">
+  </div>
+  <div class="field">
+    <label for="f-notes">Notes <span class="lbl-opt">business purpose, who attended</span></label>
+    <input class="input" id="f-notes" type="text" placeholder="e.g. Dinner with KONE facilities team, TMS renewal">
+  </div>
+  <div class="field">
+    <label>E-Invoice</label>
+    <div class="chips" id="f-einv"></div>
+    <div class="frow" style="margin-top:10px">
+      <div class="field"><label for="f-einvdl">Request deadline <span class="lbl-opt" id="f-einvdl-note"></span></label><input class="input" id="f-einvdl" type="date"></div>
+      <div class="field"><label for="f-einvlink">Portal link</label><input class="input mono" id="f-einvlink" type="url" placeholder="https://…"></div>
+    </div>
   </div>
   <div class="sheet-actions">
     <button class="btn-danger-ghost" id="btn-remove">Remove</button>
@@ -723,6 +802,8 @@
     <img id="e-preview-img" alt="Receipt PDF preview" style="display:none">
     <span class="open-tag" id="e-preview-tag" style="display:none">Tap to open PDF</span>
   </div>
+  <button class="btn-ghost" id="btn-repair" style="display:none;color:var(--link);font-weight:600;font-size:13px;padding:0;margin:-8px 0 14px">Repair PDF link</button>
+  <div id="e-pick" style="display:none;margin:-4px 0 14px"></div>
   <div class="field">
     <label for="e-merchant">Merchant</label>
     <input class="input" id="e-merchant" type="text">
@@ -742,6 +823,10 @@
     </div>
   </div>
   <div class="field">
+    <label>Entity</label>
+    <div class="chips" id="e-entity"></div>
+  </div>
+  <div class="field">
     <label>Purpose</label>
     <div class="chips" id="e-chips"></div>
   </div>
@@ -749,12 +834,29 @@
     <label for="e-other">Describe the purpose</label>
     <input class="input" id="e-other" type="text">
   </div>
+  <div class="field">
+    <label for="e-notes">Notes <span class="lbl-opt">business purpose, who attended</span></label>
+    <input class="input" id="e-notes" type="text">
+  </div>
+  <div class="field">
+    <label>E-Invoice</label>
+    <div class="chips" id="e-einv"></div>
+    <div class="frow" style="margin-top:10px">
+      <div class="field"><label for="e-einvdl">Request deadline</label><input class="input" id="e-einvdl" type="date"></div>
+      <div class="field"><label for="e-einvref">Validation ref</label><input class="input mono" id="e-einvref" type="text" placeholder="MyInvois UUID"></div>
+    </div>
+    <div class="field"><label for="e-einvlink">Portal link</label><input class="input mono" id="e-einvlink" type="url" placeholder="https://…"></div>
+    <a class="btn-ghost" id="e-einv-open" href="#" target="_blank" rel="noopener" style="display:none;color:var(--link);font-weight:600;font-size:13px;padding:0">Open merchant e-invoice portal</a>
+  </div>
+  <div class="field"><label>Tax treatment <span class="lbl-opt">auto from purpose, hint only</span></label><div class="help" id="e-tax" style="margin-top:0"></div></div>
   <label class="check" id="e-movepdf-wrap"><input type="checkbox" id="e-movepdf" checked><span>Also move and rename the PDF in OneDrive to match the corrected date, merchant and amount</span></label>
   <div class="sheet-actions">
     <button class="btn btn-outline" id="btn-edit-cancel">Cancel</button>
     <button class="btn btn-primary" id="btn-edit-save">Save changes</button>
   </div>
   <div class="setup-status" id="edit-status"></div>
+  <label class="check" id="e-delpdf-wrap" style="display:none;margin-top:14px"><input type="checkbox" id="e-delpdf" checked><span>Also delete the PDF file (goes to the OneDrive recycle bin)</span></label>
+  <button class="btn-danger-ghost" id="btn-edit-delete" style="width:100%;margin-top:14px">Delete this receipt</button>
 </div>
 
 <!-- claims breakdown sheet -->
@@ -804,10 +906,24 @@
   const TABLE = 'Claims';
   // Columns are addressed by header name, not position, so the user may add
   // or reorder their own columns without breaking the app.
-  const COLS = {date:'Date', merchant:'Merchant', purpose:'Purpose', amount:'Amount (RM)', pdf:'Receipt PDF', scanned:'Scanned on', invoice:'Invoice No'};
-  const DEFAULT_COLS = [COLS.date, COLS.merchant, COLS.purpose, COLS.amount, COLS.pdf, COLS.scanned, COLS.invoice];
+  const COLS = {date:'Date', merchant:'Merchant', purpose:'Purpose', amount:'Amount (RM)', pdf:'Receipt PDF', scanned:'Scanned on', invoice:'Invoice No', pdfid:'PDF Id',
+                entity:'Entity', notes:'Notes', tax:'Tax Treatment', einvstatus:'E-Invoice Status', einvref:'E-Invoice Ref', einvlink:'E-Invoice Link', einvdeadline:'E-Invoice Deadline'};
+  const DEFAULT_COLS = Object.keys(COLS).map(k=>COLS[k]);
+  const EINV = ['Not requested','Requested','Validated','Not applicable'];
+  const DEFAULT_ENTITIES = ['Aparobot','Boldfaces'];
+  const DEFAULT_TAX = {
+    'Client entertainment':'Entertainment (50% deductible)',
+    'Client gifts':'Entertainment / gifts (50%; promotional gifts may be 100%)',
+    'Meals':'Entertainment or staff meals (confirm)',
+    'Travel':'Business travel (100%)',
+    'Accommodation':'Business travel (100%)',
+    'Parking':'Business travel (100%)',
+    'Toll':'Business travel (100%)',
+    'Hardware':'Asset: capital allowance (confirm)',
+    'Software':'Subscription expense or licence (confirm)'
+  };
   const DEFAULT_LABELS = ['Meals','Parking','Toll','Client entertainment','Client gifts','Travel','Accommodation','Hardware','Software'];
-  const CLAIMS_XLSX_B64 = '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';
+  const CLAIMS_XLSX_B64 = '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';
 
   const S = {
     get(k, d){ try{ const v = localStorage.getItem('rs.'+k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } },
@@ -834,6 +950,30 @@
     const list = Array.isArray(raw) ? raw : DEFAULT_LABELS;
     return list.filter(Boolean).concat(['Others']);
   }
+  function entities(){
+    const raw = S.get('entities', null);
+    return (Array.isArray(raw) && raw.length) ? raw.filter(Boolean) : DEFAULT_ENTITIES.slice();
+  }
+  function taxMap(){ const m = S.get('taxMap', null); return (m && typeof m==='object') ? m : DEFAULT_TAX; }
+  function taxFor(purpose){ const m = taxMap(); if(!purpose) return ''; return m[purpose] || 'Review with accountant'; }
+  function monthEndISO(iso){
+    const m = /^(\d{4})-(\d{2})/.exec(iso||''); if(!m) return '';
+    const d = new Date(+m[1], +m[2], 0);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function daysUntil(iso){ const d = rowDateISO(iso); if(!d) return null; const t = new Date(); t.setHours(0,0,0,0); return Math.round((new Date(d+'T00:00:00') - t)/86400000); }
+  function einvBadge(rec){
+    const s = rec.einvstatus || '';
+    if(!s) return '';
+    if(s==='Validated') return '<span class="purpose-badge b-val">e-Inv validated</span>';
+    if(s==='Not applicable') return '<span class="purpose-badge">e-Inv n/a</span>';
+    if(s==='Requested') return '<span class="purpose-badge b-req">e-Inv requested</span>';
+    const dl = daysUntil(rec.einvdeadline);
+    if(dl!==null && dl < 0) return '<span class="purpose-badge b-late">e-Inv deadline passed</span>';
+    if(dl!==null && dl <= 3) return '<span class="purpose-badge b-nr">e-Inv due '+(dl===0?'today':'in '+dl+'d')+'</span>';
+    return '<span class="purpose-badge b-nr">e-Inv not requested</span>';
+  }
+
   function basePath(){
     let p = (S.get('base','/Receipts')||'/Receipts').trim();
     if(!p.startsWith('/')) p = '/'+p;
@@ -952,6 +1092,9 @@
     $('#s-apikey').value = S.get('apiKey','');
     $('#s-base').value = S.get('base','/Receipts');
     $('#s-device').value = deviceName();
+    $('#s-enhance').checked = S.get('enhance', true);
+    $('#s-entities').value = entities().join(', ');
+    const tm = taxMap(); $('#s-taxmap').value = Object.keys(tm).map(k=>k+' = '+tm[k]).join('\n');
     const raw = S.get('labels', DEFAULT_LABELS);
     $('#s-labels').value = (Array.isArray(raw)?raw:DEFAULT_LABELS).join(', ');
   }
@@ -968,6 +1111,18 @@
   bindSetting('#s-base','base');
   bindSetting('#s-device','deviceName');
   $('#s-device').addEventListener('change', ()=>schedulePush());
+  $('#s-enhance').addEventListener('change', e=>S.set('enhance', !!e.target.checked));
+  $('#s-entities').addEventListener('change', e=>{
+    const list = e.target.value.split(',').map(s=>s.trim()).filter(Boolean);
+    S.set('entities', list.length ? list : DEFAULT_ENTITIES);
+    toast('Entities saved');
+  });
+  $('#s-taxmap').addEventListener('change', e=>{
+    const m = {};
+    e.target.value.split('\n').forEach(line=>{ const i = line.indexOf('='); if(i>0){ const k=line.slice(0,i).trim(), v=line.slice(i+1).trim(); if(k&&v) m[k]=v; } });
+    S.set('taxMap', Object.keys(m).length ? m : DEFAULT_TAX);
+    toast('Tax hints saved');
+  });
 
   /* ---------- custom select (shadcn-style) ---------- */
   function makeSelect(el, cfg){
@@ -1158,14 +1313,15 @@
     }
     // Column migration: older workbooks lack "Invoice No"; add it at the end.
     await loadColumns();
-    if(colIndex('invoice') < 0){
+    for(const key of Object.keys(COLS)){
+      if(colIndex(key) >= 0) continue;
       const add = await graph(wb+":/workbook/tables('"+TABLE+"')/columns/add", {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({name: COLS.invoice})
+        body: JSON.stringify({name: COLS[key]})
       });
       if(!add.ok){
         const err = await add.json().catch(()=>({}));
-        throw new Error('Could not add the Invoice No column: '+((err.error&&err.error.message)||add.status));
+        throw new Error('Could not add the '+COLS[key]+' column: '+((err.error&&err.error.message)||add.status));
       }
       await loadColumns();
     }
@@ -1215,7 +1371,7 @@
   }
 
   /* =============== Claude extraction =============== */
-  const PROMPT = 'Read this receipt photo. If more than one image is provided, they are sequential segments of the SAME single receipt, ordered top to bottom. This is a Malaysian receipt: dates are written day/month/year, so 11/09/2026 means 11 September 2026. Never interpret a date as month/day/year. Respond with ONLY a JSON object, no markdown, no explanation: {"merchant": string (business name in proper case), "date": "YYYY-MM-DD" or null if unreadable, "invoice": string (the invoice, receipt or order number exactly as printed) or null, "total": number (the final amount actually paid, after tax, service charge and rounding) or null, "currency": ISO 4217 code string, "confidence": "high" or "low", "reason": string (only when confidence is low, one short sentence why)}';
+  const PROMPT = 'Read this receipt photo. If more than one image is provided, they are sequential segments of the SAME single receipt, ordered top to bottom. This is a Malaysian receipt: dates are written day/month/year, so 11/09/2026 means 11 September 2026. Never interpret a date as month/day/year. Respond with ONLY a JSON object, no markdown, no explanation: {"merchant": string (business name in proper case), "date": "YYYY-MM-DD" or null if unreadable, "invoice": string (the invoice, receipt or order number exactly as printed) or null, "einvoice_deadline": "YYYY-MM-DD" if the receipt states an e-invoice registration deadline or window (e.g. "within 7 days" from the receipt date, or "by the 3rd of the following month"), else null, "einvoice_link": string (the e-invoice portal URL printed on the receipt, if any) or null, "total": number (the final amount actually paid, after tax, service charge and rounding) or null, "currency": ISO 4217 code string, "confidence": "high" or "low", "reason": string (only when confidence is low, one short sentence why)}';
 
   async function extract(receipt){
     const key = S.get('apiKey','');
@@ -1269,6 +1425,7 @@
       id: nextId++,
       uid: Math.random().toString(36).slice(2,8),
       merchant:'', invoice:'', amount:null, dateISO: todayISO(),
+      entity: S.get('lastEntity','') || (entities().length===1 ? entities()[0] : ''), notes:'', einvStatus:'Not requested', einvRef:'', einvLink:'', einvDeadline:'', einvDlDefault:true,
       purpose:null, other:'',
       flag:false, flagReason:'',
       status:'reading',
@@ -1311,9 +1468,14 @@
       const out = await extract(r);
       r.merchant = (out.merchant||'').trim() || 'Unknown merchant';
       r.invoice = (out.invoice===null||out.invoice===undefined) ? '' : String(out.invoice).trim();
+      r.einvLink = (out.einvoice_link && /^https?:\/\//i.test(String(out.einvoice_link))) ? String(out.einvoice_link).trim() : '';
+      const dlRaw = /^\d{4}-\d{2}-\d{2}$/.test(out.einvoice_deadline||'') ? out.einvoice_deadline : '';
+      r.einvDeadline = dlRaw;
+      r.einvDlDefault = !dlRaw;
       r.amount = (typeof out.total==='number' && out.total>0) ? out.total : null;
       const sd = saneDate(out.date);
       r.dateISO = sd.iso;
+      if(!r.einvDeadline) r.einvDeadline = monthEndISO(r.dateISO);
       const cur = (out.currency||'MYR').toUpperCase();
       r.flag = false; r.flagReason = '';
       if(sd.note){ r.flag = true; r.flagReason = sd.note; }
@@ -1508,6 +1670,7 @@
   }
 
   function closeCamera(){
+    if(enh.open) closeEnhance();
     if(editor.open) closeCropEditor();
     cam.running = false;
     cancelAnimationFrame(cam.raf);
@@ -1881,6 +2044,297 @@
     cam.busy = false;
   }
 
+  /* =============== receipt enhancement: lighting + dewarp =============== */
+  function flattenLightingMat(cvm, src){
+    // Estimate the paper's illumination (large morphological close removes
+    // text) and divide it out, so shadows and curl shading disappear.
+    const W = src.cols, H = src.rows;
+    const rgb = new cvm.Mat(); cvm.cvtColor(src, rgb, cvm.COLOR_RGBA2RGB);
+    const sc = Math.min(1, 400/W);
+    const small = new cvm.Mat();
+    cvm.resize(rgb, small, new cvm.Size(Math.max(2,Math.round(W*sc)), Math.max(2,Math.round(H*sc))), 0, 0, cvm.INTER_AREA);
+    const k = Math.max(15, Math.round(small.cols/14)) | 1;
+    const kern = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(k,k)); // rect kernel is separable and fast
+    const bgS = new cvm.Mat(); cvm.morphologyEx(small, bgS, cvm.MORPH_CLOSE, kern);
+    cvm.GaussianBlur(bgS, bgS, new cvm.Size(k,k), 0);
+    const bg = new cvm.Mat(); cvm.resize(bgS, bg, new cvm.Size(W,H), 0, 0, cvm.INTER_LINEAR);
+    const out8 = new cvm.Mat(), out = new cvm.Mat();
+    cvm.divide(rgb, bg, out8, 242); // 8-bit divide with scale, saturating
+    cvm.cvtColor(out8, out, cvm.COLOR_RGB2RGBA);
+    [rgb, small, kern, bgS, bg, out8].forEach(m=>m.delete());
+    return out;
+  }
+
+  function fitQuad(xs, ys, xm){
+    // least-squares y = a u^2 + b u + c with u = x - xm
+    let S0=0,S1=0,S2=0,S3=0,S4=0,T0=0,T1=0,T2=0;
+    for(let i=0;i<xs.length;i++){
+      const u = xs[i]-xm, u2 = u*u, y = ys[i];
+      S0++; S1+=u; S2+=u2; S3+=u2*u; S4+=u2*u2; T0+=y; T1+=u*y; T2+=u2*y;
+    }
+    const det = S4*(S2*S0-S1*S1) - S3*(S3*S0-S1*S2) + S2*(S3*S1-S2*S2);
+    if(Math.abs(det) < 1e-9) return {a:0,b:0,c:T0/Math.max(1,S0)};
+    const a = (T2*(S2*S0-S1*S1) - S3*(T1*S0-S1*T0) + S2*(T1*S1-S2*T0)) / det;
+    const b = (S4*(T1*S0-S1*T0) - T2*(S3*S0-S1*S2) + S2*(S3*T0-T1*S2)) / det;
+    const c = (S4*(S2*T0-T1*S1) - S3*(S3*T0-T1*S2) + T2*(S3*S1-S2*S2)) / det;
+    return {a,b,c};
+  }
+
+  function detectTextLines(cvm, gray){
+    const W = gray.cols, H = gray.rows;
+    const bin = new cvm.Mat();
+    cvm.adaptiveThreshold(gray, bin, 255, cvm.ADAPTIVE_THRESH_GAUSSIAN_C, cvm.THRESH_BINARY_INV, 25, 15);
+    const kw = Math.max(15, Math.round(W/12)) | 1;
+    const kern = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(kw, 3));
+    const blobs = new cvm.Mat(); cvm.morphologyEx(bin, blobs, cvm.MORPH_CLOSE, kern);
+    const contours = new cvm.MatVector(), hier = new cvm.Mat();
+    cvm.findContours(blobs, contours, hier, cvm.RETR_EXTERNAL, cvm.CHAIN_APPROX_SIMPLE);
+    const data = blobs.data, lines = [];
+    for(let i=0; i<contours.size(); i++){
+      const c = contours.get(i);
+      const bb = cvm.boundingRect(c);
+      if(bb.width >= 0.30*W && bb.height >= 3 && bb.height <= 0.08*H){
+        const xs=[], ys=[];
+        for(let x=bb.x; x<bb.x+bb.width; x+=3){
+          let s=0, n=0;
+          for(let y=bb.y; y<bb.y+bb.height; y++){ if(data[y*W+x]){ s+=y; n++; } }
+          if(n){ xs.push(x); ys.push(s/n); }
+        }
+        if(xs.length >= 8){
+          const xm = bb.x + bb.width/2;
+          const f = fitQuad(xs, ys, xm);
+          lines.push({x0:bb.x, x1:bb.x+bb.width, xm, yc:f.c, a:f.a, b:f.b, w:bb.width, bow:Math.abs(f.a)*Math.pow(bb.width/2,2)});
+        }
+      }
+      c.delete();
+    }
+    [bin, kern, blobs, contours, hier].forEach(m=>m.delete());
+    lines.sort((p,q)=>p.yc-q.yc);
+    return lines;
+  }
+  function medianBow(lines, W){
+    const b = lines.filter(l=>l.w >= 0.45*W).map(l=>l.bow).sort((p,q)=>p-q);
+    if(!b.length) return 0;
+    return b[Math.floor(b.length/2)];
+  }
+
+  function solveLinear(A, b){
+    // Gaussian elimination with partial pivoting; A is n x n (array of rows)
+    const n = b.length;
+    for(let i=0;i<n;i++){
+      let p=i; for(let r=i+1;r<n;r++) if(Math.abs(A[r][i])>Math.abs(A[p][i])) p=r;
+      if(Math.abs(A[p][i])<1e-12) return null;
+      if(p!==i){ const t=A[i]; A[i]=A[p]; A[p]=t; const tb=b[i]; b[i]=b[p]; b[p]=tb; }
+      for(let r=i+1;r<n;r++){
+        const f=A[r][i]/A[i][i]; if(!f) continue;
+        for(let c=i;c<n;c++) A[r][c]-=f*A[i][c];
+        b[r]-=f*b[i];
+      }
+    }
+    const x=new Array(n).fill(0);
+    for(let i=n-1;i>=0;i--){ let s=b[i]; for(let c=i+1;c<n;c++) s-=A[i][c]*x[c]; x[i]=s/A[i][i]; }
+    return x;
+  }
+
+  function lineSamples(cvm, gray){
+    // baseline (bottom-most ink) per column for each detected text line
+    const W = gray.cols, H = gray.rows;
+    const bin = new cvm.Mat();
+    cvm.adaptiveThreshold(gray, bin, 255, cvm.ADAPTIVE_THRESH_GAUSSIAN_C, cvm.THRESH_BINARY_INV, 25, 15);
+    const kw = Math.max(15, Math.round(W/12)) | 1;
+    const kern = cvm.getStructuringElement(cvm.MORPH_RECT, new cvm.Size(kw, 3));
+    const blobs = new cvm.Mat(); cvm.morphologyEx(bin, blobs, cvm.MORPH_CLOSE, kern);
+    const contours = new cvm.MatVector(), hier = new cvm.Mat();
+    cvm.findContours(blobs, contours, hier, cvm.RETR_EXTERNAL, cvm.CHAIN_APPROX_SIMPLE);
+    const data = blobs.data, lines = [];
+    for(let i=0; i<contours.size(); i++){
+      const c = contours.get(i);
+      const bb = cvm.boundingRect(c);
+      if(bb.width >= 0.40*W && bb.height >= 3 && bb.height <= 0.08*H){
+        const xs=[], ys=[];
+        for(let x=bb.x; x<bb.x+bb.width; x+=3){
+          let bottom=-1;
+          for(let y=bb.y+bb.height-1; y>=bb.y; y--){ if(data[y*W+x]){ bottom=y; break; } }
+          if(bottom>=0){ xs.push(x); ys.push(bottom); }
+        }
+        if(xs.length >= 10){
+          const sorted = ys.slice().sort((p,q)=>p-q);
+          lines.push({xs, ys, ym: sorted[Math.floor(sorted.length/2)], w:bb.width});
+        }
+      }
+      c.delete();
+    }
+    [bin, kern, blobs, contours, hier].forEach(m=>m.delete());
+    lines.sort((p,q)=>p.ym-q.ym);
+    return lines;
+  }
+
+  function fitCurl(lines, W, H){
+    // Global model in normalized units: y = yc_i + (a0 + a1*v_i)*u^2 + (b0 + b1*v_i)*u
+    // with u = (x - W/2)/W and v = ym/H, so all predictor columns are O(1).
+    const N = lines.length, n = N+4;
+    const keep = lines.map(l=>l.xs.map(()=>true));
+    const active = lines.map(()=>true);
+    let sol = null;
+    for(let pass=0; pass<3; pass++){
+      const A = Array.from({length:n}, ()=>new Array(n).fill(0)); const b = new Array(n).fill(0);
+      let activeCount = 0;
+      lines.forEach((l,i)=>{
+        if(!active[i]){ A[i][i] = 1; b[i] = 0; return; } // dummy row keeps the system square
+        activeCount++;
+        const v = l.ym/H;
+        for(let k=0;k<l.xs.length;k++){
+          if(!keep[i][k]) continue;
+          const u = (l.xs[k]-W/2)/W, y = l.ys[k];
+          const preds = [[i,1],[N,u*u],[N+1,v*u*u],[N+2,u],[N+3,v*u]];
+          for(const [pi,pv] of preds){ for(const [qi,qv] of preds) A[pi][qi]+=pv*qv; b[pi]+=pv*y; }
+        }
+      });
+      if(activeCount < 4) break;
+      const s2 = solveLinear(A, b);
+      if(!s2) break;
+      sol = s2;
+      let changed = false;
+      lines.forEach((l,i)=>{
+        if(!active[i]) return;
+        const v = l.ym/H; let kept = 0;
+        for(let k=0;k<l.xs.length;k++){
+          const u = (l.xs[k]-W/2)/W;
+          const pred = sol[i] + (sol[N]+sol[N+1]*v)*u*u + (sol[N+2]+sol[N+3]*v)*u;
+          const good = Math.abs(l.ys[k]-pred) <= 3;
+          if(good!==keep[i][k]) changed = true;
+          keep[i][k] = good; if(good) kept++;
+        }
+        if(kept < Math.max(8, l.xs.length*0.3)){ active[i] = false; changed = true; }
+      });
+      if(!changed) break;
+    }
+    if(!sol) return null;
+    return {a0:sol[N], a1:sol[N+1], b0:sol[N+2], b1:sol[N+3], W, H};
+  }
+  function dyAt(model, x, y){
+    const u = (x - model.W/2)/model.W, v = y/model.H;
+    return (model.a0 + model.a1*v)*u*u + (model.b0 + model.b1*v)*u;
+  }
+  function curlAmount(model, W, H){
+    // largest edge displacement anywhere on the page, in analysis pixels
+    let m=0;
+    for(const y of [0, H/2, H]) for(const x of [0, W]) m = Math.max(m, Math.abs(dyAt(model, x, y)));
+    return m;
+  }
+
+  function dewarpOnce(cvm, src){
+    const W = src.cols, H = src.rows;
+    const A = 800, sc = Math.min(1, A/W);
+    const aw = Math.max(2, Math.round(W*sc)), ah = Math.max(2, Math.round(H*sc));
+    const small = new cvm.Mat(), gray = new cvm.Mat();
+    cvm.resize(src, small, new cvm.Size(aw, ah), 0, 0, cvm.INTER_AREA);
+    cvm.cvtColor(small, gray, cvm.COLOR_RGBA2GRAY);
+    const lines = lineSamples(cvm, gray);
+    if(lines.length < 4){ small.delete(); gray.delete(); return {skipped:true, lines:lines.length, before:0}; }
+    const model = fitCurl(lines, aw, ah);
+    if(!model){ small.delete(); gray.delete(); return {skipped:true, lines:lines.length, before:0}; }
+    const before = curlAmount(model, aw, ah);
+    if(before < 2.0){ small.delete(); gray.delete(); return {skipped:true, lines:lines.length, before}; }
+    const mapYs = new Float32Array(aw*ah), mapXs = new Float32Array(aw*ah);
+    const xc = aw/2;
+    for(let y=0; y<ah; y++){
+      for(let x=0; x<aw; x++){ mapYs[y*aw+x] = y + dyAt(model, x, y); mapXs[y*aw+x] = x; }
+    }
+    const mxS = cvm.matFromArray(ah, aw, cvm.CV_32FC1, mapXs);
+    const myS = cvm.matFromArray(ah, aw, cvm.CV_32FC1, mapYs);
+    const mx = new cvm.Mat(), my = new cvm.Mat();
+    cvm.resize(mxS, mx, new cvm.Size(W,H), 0, 0, cvm.INTER_LINEAR);
+    cvm.resize(myS, my, new cvm.Size(W,H), 0, 0, cvm.INTER_LINEAR);
+    mx.convertTo(mx, cvm.CV_32FC1, 1/sc);
+    my.convertTo(my, cvm.CV_32FC1, 1/sc);
+    const out = new cvm.Mat();
+    cvm.remap(src, out, mx, my, cvm.INTER_LINEAR, cvm.BORDER_REPLICATE);
+    // self-check
+    const small2 = new cvm.Mat(), gray2 = new cvm.Mat();
+    cvm.resize(out, small2, new cvm.Size(aw, ah), 0, 0, cvm.INTER_AREA);
+    cvm.cvtColor(small2, gray2, cvm.COLOR_RGBA2GRAY);
+    const lines2 = lineSamples(cvm, gray2);
+    const model2 = lines2.length>=4 ? fitCurl(lines2, aw, ah) : null;
+    const after = model2 ? curlAmount(model2, aw, ah) : before;
+    [small, gray, mxS, myS, mx, my, small2, gray2].forEach(m=>m.delete());
+    const improved = after < before*0.6;
+    if(!improved){ out.delete(); return {skipped:true, before, after, lines:lines.length}; }
+    return {mat:out, before, after, lines:lines.length};
+  }
+
+  function dewarpLinesMat(cvm, src){
+    // up to two passes: a second pass mops up residual bow after a large correction
+    let r = dewarpOnce(cvm, src);
+    if(r.skipped) return r;
+    if(r.after > 2){
+      const r2 = dewarpOnce(cvm, r.mat);
+      if(!r2.skipped){ r.mat.delete(); return {mat:r2.mat, before:r.before, after:r2.after, lines:r.lines, passes:2}; }
+    }
+    r.passes = 1;
+    return r;
+  }
+
+  function dataUrlToMat(url){
+    return new Promise((res, rej)=>{
+      const img = new Image();
+      img.onload = ()=>{ const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img,0,0); res(window.cv.imread(c)); };
+      img.onerror = ()=>rej(new Error('image load failed'));
+      img.src = url;
+    });
+  }
+  function matToDataUrl(mat){ const c = document.createElement('canvas'); window.cv.imshow(c, mat); return c.toDataURL('image/jpeg', 0.87); }
+
+  /* =============== enhance step (after crop) =============== */
+  const enh = {open:false, versions:{}, selected:'original', appendMode:false};
+  const ENH_LABELS = {original:'Original', flat:'Flattened', straight:'Straightened'};
+  function setEnhStatus(t){ $('#enh-status').textContent = t; }
+  function renderEnhance(){
+    const img = $('#enh-img');
+    if(enh.versions[enh.selected]) img.src = enh.versions[enh.selected];
+    $('#enh-seg').innerHTML = ['original','flat','straight'].map(k=>
+      '<button type="button" data-k="'+k+'" class="'+(enh.selected===k?'on':'')+'"'+(enh.versions[k]?'':' disabled')+'>'+ENH_LABELS[k]+'</button>'
+    ).join('');
+    $('#enh-seg').querySelectorAll('button').forEach(b=>b.addEventListener('click', ()=>{ if(enh.versions[b.dataset.k]){ enh.selected = b.dataset.k; renderEnhance(); } }));
+  }
+  async function openEnhance(cropUrl, appendMode){
+    enh.open = true; enh.appendMode = appendMode;
+    enh.versions = {original:cropUrl}; enh.selected = 'original';
+    $('#cropview').classList.remove('show');
+    $('#enhanceview').classList.add('show');
+    renderEnhance();
+    setEnhStatus('Flattening lighting…');
+    await sleep(60);
+    let src = null, flat = null;
+    try{
+      src = await dataUrlToMat(cropUrl);
+      flat = flattenLightingMat(window.cv, src);
+      enh.versions.flat = matToDataUrl(flat);
+      enh.selected = 'flat'; renderEnhance();
+      setEnhStatus('Checking for curl…');
+      await sleep(30);
+      const r = dewarpLinesMat(window.cv, flat);
+      if(r.mat){
+        enh.versions.straight = matToDataUrl(r.mat); r.mat.delete();
+        enh.selected = 'straight';
+        setEnhStatus('Straightened: bow '+r.before.toFixed(0)+'px → '+r.after.toFixed(1)+'px'+(r.passes===2?' (2 passes)':''));
+      }else{
+        setEnhStatus(r.lines < 4 ? 'Flattened. Not enough text lines to judge curl.' : 'Flattened. Already straight.');
+      }
+    }catch(e){ setEnhStatus('Enhancement failed: '+e.message+'. Original kept.'); }
+    if(flat) flat.delete(); if(src) src.delete();
+    renderEnhance();
+  }
+  function closeEnhance(){ enh.open = false; enh.versions = {}; $('#enhanceview').classList.remove('show'); $('#enh-img').removeAttribute('src'); }
+  $('#enh-back').addEventListener('click', ()=>{ closeEnhance(); $('#cropview').classList.add('show'); });
+  $('#enh-use').addEventListener('click', ()=>{
+    const url = enh.versions[enh.selected] || enh.versions.original;
+    const appendMode = enh.appendMode;
+    closeEnhance();
+    closeCropEditor();
+    finishCapture(url, appendMode);
+  });
+
   /* =============== post-capture crop editor =============== */
   const editor = {open:false, fc:null, quad:null, iw:0, ih:0, s:1, ox:0, oy:0, drag:null, appendMode:false, dupeArmed:false};
 
@@ -2059,7 +2513,12 @@
       hashFromDataUrl(dataUrl).then(h=>{ if(h) cam.sessionHashes.push(h); });
     }
     const appendMode = editor.appendMode;
+    if(S.get('enhance', true) && cvOk()){ openEnhance(dataUrl, appendMode); return; }
     closeCropEditor();
+    finishCapture(dataUrl, appendMode);
+  });
+
+  async function finishCapture(dataUrl, appendMode){
     flashScreen();
     if(navigator.vibrate) navigator.vibrate(40);
     if(appendMode && tray.length){
@@ -2076,7 +2535,7 @@
     }
     updateCamCount();
     camStatus('Captured — line up the next receipt');
-  });
+  }
 
   function warpFromCanvas(canvas, q, k){
     const cvm = window.cv;
@@ -2191,6 +2650,14 @@
     renderChips(r.purpose);
     $('#f-other').value = r.other || '';
     $('#f-other-wrap').style.display = r.purpose==='Others' ? 'block':'none';
+    const ents = entities();
+    $('#f-entity-wrap').style.display = ents.length>1 ? 'block':'none';
+    renderChipsInto($('#f-entity'), r.entity || (ents.length===1?ents[0]:''), ()=>{}, ents);
+    $('#f-notes').value = r.notes || '';
+    renderChipsInto($('#f-einv'), r.einvStatus || 'Not requested', ()=>{}, EINV);
+    $('#f-einvdl').value = r.einvDeadline || '';
+    $('#f-einvdl-note').textContent = r.einvDlDefault ? '(assumed: month end)' : '(from receipt)';
+    $('#f-einvlink').value = r.einvLink || '';
     $('#scrim').classList.add('show');
     $('#sheet').classList.add('show');
   }
@@ -2228,6 +2695,16 @@
     const amt = parseFloat($('#f-amount').value);
     if(!(amt>0)){ toast('Amount must be above zero'); return; }
     if(sel.dataset.p==='Others' && !$('#f-other').value.trim()){ toast('Describe the purpose for Others'); return; }
+    const entSel = $('#f-entity .chip.on');
+    const ents = entities();
+    const entity = ents.length>1 ? (entSel ? entSel.dataset.p : '') : ents[0];
+    if(!entity){ toast('Pick which entity this receipt belongs to'); return; }
+    r.entity = entity; S.set('lastEntity', entity);
+    r.notes = $('#f-notes').value.trim();
+    const einvSel = $('#f-einv .chip.on');
+    r.einvStatus = einvSel ? einvSel.dataset.p : 'Not requested';
+    r.einvDeadline = $('#f-einvdl').value || r.einvDeadline;
+    r.einvLink = $('#f-einvlink').value.trim();
     r.merchant = $('#f-merchant').value.trim() || 'Unknown merchant';
     r.invoice = $('#f-invoice').value.trim();
     r.dateISO = $('#f-date').value || r.dateISO;
@@ -2316,7 +2793,7 @@
     const uploaded = await uploadPdf(pdfBlob, basePath()+'/'+ym+'/'+fname);
     if(onStep) onStep(2);
     const purposeText = r.purpose==='Others' ? r.other : r.purpose;
-    await appendRow(recordToValues({date:r.dateISO, merchant:r.merchant, purpose:purposeText, amount:r.amount, pdf:(uploaded&&uploaded.webUrl)||'', scanned:nowStamp(), invoice:r.invoice||''}, null));
+    await appendRow(recordToValues({date:r.dateISO, merchant:r.merchant, purpose:purposeText, amount:r.amount, pdf:(uploaded&&uploaded.webUrl)||'', scanned:nowStamp(), invoice:r.invoice||'', pdfid:(uploaded&&uploaded.id)||'', entity:r.entity||'', notes:r.notes||'', tax:taxFor(purposeText), einvstatus:r.einvStatus||'Not requested', einvref:r.einvRef||'', einvlink:r.einvLink||'', einvdeadline:r.einvDeadline||''}, null));
     pdfIndex = null;
     return uploaded;
   }
@@ -2416,13 +2893,13 @@
   let historyRows = S.get('historyCache', []);
   // migrate caches from older builds that stored positional arrays
   if(historyRows.length && Array.isArray(historyRows[0])){
-    historyRows = historyRows.map(a=>({date:a[0], merchant:a[1], purpose:a[2], amount:a[3], pdf:a[4]||'', scanned:a[5]||'', invoice:'', idx:null, raw:null}));
+    historyRows = historyRows.map(a=>({date:a[0], merchant:a[1], purpose:a[2], amount:a[3], pdf:a[4]||'', scanned:a[5]||'', invoice:'', pdfid:'', idx:null, raw:null}));
     S.set('historyCache', historyRows);
   }
 
   function appendLocalHistory(receipts){
     receipts.forEach(r=>{
-      historyRows.push({date:r.dateISO, merchant:r.merchant, purpose:r.purpose==='Others'?r.other:r.purpose, amount:r.amount, pdf:'', scanned:nowStamp(), invoice:r.invoice||'', idx:null, raw:null});
+      historyRows.push({date:r.dateISO, merchant:r.merchant, purpose:r.purpose==='Others'?r.other:r.purpose, amount:r.amount, pdf:'', scanned:nowStamp(), invoice:r.invoice||'', pdfid:'', entity:r.entity||'', notes:r.notes||'', tax:taxFor(r.purpose==='Others'?r.other:r.purpose), einvstatus:r.einvStatus||'Not requested', einvref:'', einvlink:r.einvLink||'', einvdeadline:r.einvDeadline||'', idx:null, raw:null});
     });
     S.set('historyCache', historyRows);
     renderHistory();
@@ -2481,15 +2958,42 @@
     return new Date(+m[1], +m[2]-1, +m[3]).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
   }
 
+  const hfilter = {q:'', entity: S.get('entityFilter','All'), einv:false};
+  function entityOptions(){ const set = new Set(entities()); historyRows.forEach(r=>{ if(r.entity) set.add(r.entity); }); return ['All'].concat(Array.from(set)); }
+  function renderFilterBar(){
+    $('#h-search').value = hfilter.q;
+    const opts = entityOptions();
+    if(!opts.includes(hfilter.entity)) hfilter.entity = 'All';
+    $('#h-entity').style.display = opts.length>2 ? 'flex' : 'none';
+    renderChipsInto($('#h-entity'), hfilter.entity, v=>{ hfilter.entity = v; S.set('entityFilter', v); renderHistory(); renderMonthChart(); }, opts);
+    $('#h-einv').classList.toggle('on', hfilter.einv);
+  }
+  function einvPending(r){ return (r.einvstatus==='Not requested' || r.einvstatus==='Requested'); }
+  function rowMatches(r){
+    if(hfilter.entity!=='All' && (r.entity||'')!==hfilter.entity) return false;
+    if(hfilter.einv && !einvPending(r)) return false;
+    if(hfilter.q){
+      const q = hfilter.q.toLowerCase();
+      const hay = [r.merchant, r.invoice, r.purpose, r.notes, r.entity, r.einvref, String(r.amount||''), rowDateISO(r.date)||''].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  }
+  $('#h-search').addEventListener('input', e=>{ hfilter.q = e.target.value.trim(); renderHistory(); });
+  $('#h-einv').addEventListener('click', ()=>{ hfilter.einv = !hfilter.einv; renderHistory(); });
+
   function renderHistory(){
     const el = $('#history');
+    renderFilterBar();
     if(!historyRows.length){
       el.innerHTML = '<div class="hist-empty">'+(account?'Nothing filed yet. Your first batch will appear here.':'Sign in to Microsoft 365 in Settings to see filed receipts.')+'</div>';
       return;
     }
     const groups = {};
     const order = [];
-    historyRows.map((row,i)=>({row,i})).reverse().forEach(({row,i})=>{
+    const visible = historyRows.map((row,i)=>({row,i})).filter(x=>rowMatches(x.row));
+    if(!visible.length){ el.innerHTML = '<div class="hist-empty">No receipts match this filter.</div>'; return; }
+    visible.reverse().forEach(({row,i})=>{
       const key = monthKeyOf(row.date);
       if(!groups[key]){ groups[key]=[]; order.push(key); }
       groups[key].push({row,i});
@@ -2502,9 +3006,10 @@
           const link = r.pdf ? '<a class="pdf-link" href="'+esc(r.pdf)+'" target="_blank" rel="noopener" title="Open PDF in OneDrive"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>' : '';
           const editable = r.idx!==undefined && r.idx!==null;
           const inv = r.invoice ? '<span class="purpose-badge mono-badge">#'+esc(r.invoice)+'</span>' : '';
+          const ent = (r.entity && hfilter.entity==='All') ? '<span class="purpose-badge">'+esc(r.entity)+'</span>' : '';
           return '<div class="hist-row'+(editable?' editable':'')+'" data-i="'+i+'">'
             +'<div class="info"><div class="merchant">'+esc(r.merchant)+'</div>'
-            +'<div class="meta"><span>'+shortDate(r.date)+'</span><span class="purpose-badge">'+esc(r.purpose)+'</span>'+inv+'</div></div>'
+            +'<div class="meta"><span>'+shortDate(r.date)+'</span><span class="purpose-badge">'+esc(r.purpose)+'</span>'+ent+inv+einvBadge(r)+'</div></div>'
             +'<div class="amount">RM '+fmt(parseFloat(r.amount)||0)+'</div>'
             + link
           +'</div>';
@@ -2538,6 +3043,7 @@
     const byKey = {};
     months.forEach(m=>byKey[m.key]=m);
     historyRows.forEach(r=>{
+      if(hfilter.entity!=='All' && (r.entity||'')!==hfilter.entity) return;
       const iso = rowDateISO(r.date); if(!iso) return;
       const m = byKey[iso.slice(0,7)]; if(!m) return;
       const amt = parseFloat(r.amount)||0;
@@ -2587,6 +3093,8 @@
     const total12 = data.months.reduce((s,m)=>s+m.total,0);
     const cur = data.months[data.months.length-1];
     $('#cc-total').textContent = 'RM '+fmt(total12);
+    $('#cc-kicker').textContent = 'Claims · last 12 months'+(hfilter.entity!=='All' ? ' · '+hfilter.entity : '');
+    renderEinvBanner();
     $('#cc-sub').innerHTML = 'This month <b>RM '+fmt(cur.total)+'</b><br>'+cur.count+' receipt'+(cur.count===1?'':'s');
     if(total12===0){
       $('#cc-svg').innerHTML = '<div class="cc-empty">Nothing filed in the last 12 months yet.</div>';
@@ -2597,6 +3105,21 @@
     $('#cc-legend').innerHTML = data.ranked.slice(0,6).map(p=>'<span><i style="background:'+data.colors[p]+'"></i>'+esc(p)+'</span>').join('')
       + (data.ranked.length>6 ? '<span style="color:var(--muted-2)">+'+(data.ranked.length-6)+' more</span>' : '');
   }
+
+  function renderEinvBanner(){
+    const b = $('#einv-banner'); if(!b) return;
+    const pend = historyRows.filter(r=>r.einvstatus==='Not requested');
+    if(!pend.length){ b.style.display='none'; return; }
+    const dls = pend.map(r=>daysUntil(r.einvdeadline)).filter(d=>d!==null);
+    const soon = dls.filter(d=>d>=0 && d<=3).length, late = dls.filter(d=>d<0).length;
+    const nearest = dls.filter(d=>d>=0).sort((a,b)=>a-b)[0];
+    b.className = 'banner' + (late||soon ? ' err' : ' info');
+    b.style.display = 'flex';
+    $('#einv-banner-text').textContent = pend.length+' receipt'+(pend.length>1?'s':'')+' still need an e-invoice request'
+      + (late ? ', '+late+' past deadline' : '') + (soon ? ', '+soon+' due within 3 days' : '')
+      + (nearest!==undefined && !late && !soon ? ', nearest deadline in '+nearest+' day'+(nearest===1?'':'s') : '') + '. Tap to review.';
+  }
+  $('#einv-banner').addEventListener('click', ()=>{ hfilter.einv = true; hfilter.q=''; document.querySelector('[data-tab="history"]').click(); renderHistory(); });
 
   function openStats(){
     const data = monthsData();
@@ -2760,7 +3283,7 @@
       updatedAt: new Date().toISOString(),
       items: tray.map(r=>({
         uid: r.uid, merchant: r.merchant, amount: r.amount, dateISO: r.dateISO,
-        purpose: r.purpose==='Others' ? r.other : r.purpose,
+        purpose: r.purpose==='Others' ? r.other : r.purpose, entity: r.entity||'',
         status: r.status, thumb: r.thumbUrl || null
       }))
     };
@@ -2842,7 +3365,7 @@
         ? '<span class="thumb"><img src="'+it.thumb+'" alt=""></span>'
         : '<span class="thumb-ph">'+PH_SVG+'</span>';
       const pill = REMOTE_PILL[it.status] || REMOTE_PILL.review;
-      const purpose = it.purpose ? '<span class="purpose-badge">'+esc(it.purpose)+'</span>' : '';
+      const purpose = (it.purpose ? '<span class="purpose-badge">'+esc(it.purpose)+'</span>' : '') + (it.entity ? '<span class="purpose-badge">'+esc(it.entity)+'</span>' : '');
       return '<div class="receipt-card remote">'
         + thumb
         +'<span class="info">'
@@ -2857,12 +3380,13 @@
   /* =============== edit filed receipts =============== */
   let editIdx = null;
 
-  function renderChipsInto(container, selected, onSelect){
-    container.innerHTML = labels().map(p=>
+  function renderChipsInto(container, selected, onSelect, list){
+    const items = list || labels();
+    container.innerHTML = items.map(p=>
       '<button type="button" class="chip'+(p===selected?' on':'')+'" data-p="'+esc(p)+'">'+esc(p)+'</button>'
     ).join('');
     container.querySelectorAll('.chip').forEach(c=>{
-      c.addEventListener('click', ()=>{ renderChipsInto(container, c.dataset.p, onSelect); onSelect(c.dataset.p); });
+      c.addEventListener('click', ()=>{ renderChipsInto(container, c.dataset.p, onSelect, list); onSelect(c.dataset.p); });
     });
   }
 
@@ -2878,7 +3402,8 @@
     $('#e-date').value = rowDateISO(row.date) || '';
     $('#e-amount').value = (parseFloat(row.amount)||0).toFixed(2);
     $('#e-movepdf').checked = true;
-    $('#e-movepdf-wrap').style.display = row.pdf ? 'flex' : 'none';
+    $('#e-movepdf-wrap').style.display = (row.pdf||row.pdfid) ? 'flex' : 'none';
+    deleteArmed = false; $('#btn-edit-delete').textContent = 'Delete this receipt'; $('#btn-edit-delete').disabled = false; $('#e-delpdf-wrap').style.display='none'; $('#e-delpdf').checked = true;
     loadPdfPreview(row);
     renderChipsInto($('#e-chips'), known ? purpose : 'Others', v=>{
       $('#e-other-wrap').style.display = v==='Others' ? 'block' : 'none';
@@ -2886,6 +3411,15 @@
     });
     $('#e-other').value = known ? '' : purpose;
     $('#e-other-wrap').style.display = known ? 'none' : 'block';
+    const entOpts = entities().slice(); if(row.entity && !entOpts.includes(row.entity)) entOpts.push(row.entity);
+    renderChipsInto($('#e-entity'), row.entity || '', ()=>{}, entOpts);
+    $('#e-notes').value = row.notes || '';
+    renderChipsInto($('#e-einv'), row.einvstatus || 'Not requested', ()=>{}, EINV);
+    $('#e-einvdl').value = rowDateISO(row.einvdeadline) || '';
+    $('#e-einvref').value = row.einvref || '';
+    $('#e-einvlink').value = row.einvlink || '';
+    const lk = $('#e-einv-open'); if(row.einvlink){ lk.href = row.einvlink; lk.style.display='inline'; } else lk.style.display='none';
+    $('#e-tax').textContent = row.tax || taxFor(purpose);
     $('#edit-status').textContent = '';
     $('#edit-status').className = 'setup-status';
     $('#btn-edit-save').disabled = false;
@@ -2923,12 +3457,20 @@
     if(!(amt>0)){ toast('Amount must be above zero'); return; }
     const purposeText = sel.dataset.p==='Others' ? $('#e-other').value.trim() : sel.dataset.p;
     if(!purposeText){ toast('Describe the purpose'); return; }
+    const entSel = $('#e-entity .chip.on'), einvSel = $('#e-einv .chip.on');
     const newRec = Object.assign({}, row, {
       date: $('#e-date').value || rowDateISO(row.date) || todayISO(),
       merchant: $('#e-merchant').value.trim() || row.merchant,
       invoice: $('#e-invoice').value.trim(),
       purpose: purposeText,
-      amount: Math.round(amt*100)/100
+      amount: Math.round(amt*100)/100,
+      entity: entSel ? entSel.dataset.p : (row.entity||''),
+      notes: $('#e-notes').value.trim(),
+      tax: taxFor(purposeText),
+      einvstatus: einvSel ? einvSel.dataset.p : (row.einvstatus||'Not requested'),
+      einvdeadline: $('#e-einvdl').value || rowDateISO(row.einvdeadline) || '',
+      einvref: $('#e-einvref').value.trim(),
+      einvlink: $('#e-einvlink').value.trim()
     });
     const st = $('#edit-status');
     st.className = 'setup-status';
@@ -2936,13 +3478,15 @@
     let moveNote = '';
     const detailsChanged = newRec.date!==rowDateISO(row.date) || newRec.merchant!==row.merchant || Number(newRec.amount)!==Number(row.amount);
     try{
-      if($('#e-movepdf').checked && row.pdf && detailsChanged){
+      if($('#e-movepdf').checked && (row.pdf||row.pdfid) && detailsChanged){
         st.textContent = 'Moving and renaming the PDF…';
-        try{ newRec.pdf = await movePdf(row, newRec); }
+        try{ const mv = await movePdf(row, newRec); newRec.pdf = mv.url; newRec.pdfid = mv.id; }
         catch(e){ moveNote = ' PDF could not be moved ('+e.message+'); the row was saved with the old link.'; }
       }
       st.textContent = 'Saving to '+WB_NAME+'…';
       await updateRow(row.idx, recordToValues(newRec, row.raw));
+      const changes = ['date','merchant','invoice','purpose','amount','entity','notes','einvstatus','einvref','einvdeadline'].filter(k=>String(row[k]||'')!==String(newRec[k]||'')).map(k=>k+': '+(row[k]||'')+' → '+(newRec[k]||''));
+      if(changes.length || newRec.pdf!==row.pdf) logEdit('Edit', newRec, changes.join('; ')+(newRec.pdf!==row.pdf?'; PDF moved':'')+(moveNote?'; move failed':''));
       Object.assign(row, newRec);
       S.set('historyCache', historyRows);
       renderHistory(); renderMonthChart();
@@ -2955,70 +3499,194 @@
     }
   });
 
+  /* ---- OneDrive file index & matching ---- */
+  let fileIndex = null, previewToken = 0;
+  async function listMonthFolders(){
+    const res = await graph('/me/drive/root:'+encPath(basePath())+':/children?$select=name,folder&$top=200');
+    if(!res.ok) return [];
+    return (((await res.json()).value)||[]).filter(c=>c.folder && /^\d{4}-\d{2}$/.test(c.name)).map(c=>c.name).sort().reverse();
+  }
+  async function buildFileIndex(force){
+    if(fileIndex && !force) return fileIndex;
+    const files = [];
+    for(const f of await listMonthFolders()){
+      const r = await graph('/me/drive/root:'+encPath(basePath()+'/'+f)+':/children?$select=id,name,webUrl&$top=500');
+      if(!r.ok) continue;
+      (((await r.json()).value)||[]).forEach(it=>{ if(/\.pdf$/i.test(it.name||'')) files.push({id:it.id, name:it.name, webUrl:it.webUrl, folder:f}); });
+    }
+    fileIndex = files;
+    return files;
+  }
+  function uidFromUrl(url){ const m = /_([a-z0-9]{6})\.pdf(?:$|[?#])/i.exec(url||''); return m ? m[1].toLowerCase() : ''; }
+  function matchFile(files, rec){
+    if(rec.pdfid){ const f = files.find(x=>x.id===rec.pdfid); if(f) return {f, how:'id'}; }
+    if(rec.pdf){
+      let f = files.find(x=>x.webUrl===rec.pdf);
+      if(f) return {f, how:'url'};
+      const uid = uidFromUrl(rec.pdf);
+      if(uid){ f = files.find(x=>x.name.toLowerCase().endsWith('_'+uid+'.pdf')); if(f) return {f, how:'uid'}; }
+    }
+    const slug = ('_'+sanitizeName(rec.merchant||'')+'_RM'+Number(rec.amount||0).toFixed(2)+'_').toLowerCase();
+    const cands = files.filter(x=>x.name.toLowerCase().includes(slug));
+    if(cands.length){
+      const iso = rowDateISO(rec.date)||'';
+      const exact = cands.find(x=>x.name.startsWith(iso));
+      return {f: exact||cands[0], how:'match', ambiguous: cands.length>1 && !exact};
+    }
+    return null;
+  }
+
   /* ---- PDF preview via OneDrive thumbnails (no download) ---- */
-  let pdfIndex = null, previewToken = 0;
-  async function getPdfIndex(force){
-    if(pdfIndex && !force) return pdfIndex;
-    pdfIndex = await buildPdfIndex();
-    return pdfIndex;
+  async function thumbUrlFor(id){
+    let r = await graph('/me/drive/items/'+id+'/thumbnails?select=c1200x1200');
+    if(r.status===404) return {missing:true};
+    if(r.ok){ const v = ((await r.json()).value)||[]; const u = v[0] && v[0].c1200x1200 && v[0].c1200x1200.url; if(u) return {url:u}; }
+    r = await graph('/me/drive/items/'+id+'/thumbnails/0/large');
+    if(r.status===404) return {missing:true};
+    if(r.ok){ const u = (await r.json()).url; if(u) return {url:u}; }
+    return {};
   }
   async function loadPdfPreview(row){
     const wrap = $('#e-preview'), ph = $('#e-preview-ph'), img = $('#e-preview-img'), tag = $('#e-preview-tag');
     img.style.display = 'none'; img.removeAttribute('src'); tag.style.display = 'none';
+    $('#btn-repair').style.display = 'none'; $('#e-pick').style.display = 'none';
     ph.style.display = 'block'; ph.textContent = 'Loading preview…';
-    wrap.style.display = row.pdf ? 'flex' : 'none';
-    if(!row.pdf) return;
+    wrap.style.display = (row.pdf || row.pdfid) ? 'flex' : 'none';
+    if(!row.pdf && !row.pdfid){ ph.textContent = 'No PDF is linked to this row.'; wrap.style.display='flex'; $('#btn-repair').style.display='inline'; return; }
     if(!isOnline()){ ph.textContent = 'Preview needs a connection'; return; }
     const token = ++previewToken;
     try{
-      let idx = await getPdfIndex(false), item = idx[row.pdf];
-      if(!item){ idx = await getPdfIndex(true); item = idx[row.pdf]; }
-      if(!item) throw new Error('PDF not located');
-      let url = null;
-      let r = await graph('/me/drive/items/'+item.id+'/thumbnails?select=c1200x1200');
-      if(r.ok){ const v = ((await r.json()).value)||[]; url = v[0] && v[0].c1200x1200 && v[0].c1200x1200.url; }
-      if(!url){ r = await graph('/me/drive/items/'+item.id+'/thumbnails/0/large'); if(r.ok) url = (await r.json()).url; }
-      if(!url) throw new Error('no preview available');
+      let res = row.pdfid ? await thumbUrlFor(row.pdfid) : {};
+      if(!res.url){
+        const files = await buildFileIndex(false);
+        let m = matchFile(files, row);
+        if(!m || m.how==='match'){ m = matchFile(await buildFileIndex(true), row); }
+        if(m && m.how!=='match') res = await thumbUrlFor(m.f.id);
+        if(!res.url){ ph.textContent = 'The linked PDF was not found in OneDrive.'; $('#btn-repair').style.display='inline'; return; }
+      }
       if(token !== previewToken) return;
       img.onload = ()=>{ if(token !== previewToken) return; ph.style.display = 'none'; img.style.display = 'block'; tag.style.display = 'inline'; };
-      img.onerror = ()=>{ if(token === previewToken) ph.textContent = 'Preview unavailable'; };
-      img.src = url;
-    }catch(e){ if(token === previewToken) ph.textContent = 'Preview unavailable ('+e.message+')'; }
+      img.onerror = ()=>{ if(token === previewToken){ ph.textContent = 'Preview unavailable'; } };
+      img.src = res.url;
+    }catch(e){ if(token === previewToken){ ph.textContent = 'Preview unavailable ('+e.message+')'; $('#btn-repair').style.display='inline'; } }
   }
   $('#e-preview-img').addEventListener('click', ()=>{
     const row = editIdx!==null ? historyRows[editIdx] : null;
     if(row && row.pdf) window.open(row.pdf, '_blank', 'noopener');
   });
 
+  /* ---- repair a broken PDF link ---- */
+  async function relinkRow(row, f, how){
+    const rec = Object.assign({}, row, {pdf:f.webUrl, pdfid:f.id});
+    await updateRow(row.idx, recordToValues(rec, row.raw));
+    Object.assign(row, rec);
+    S.set('historyCache', historyRows);
+    logEdit('Relink PDF', row, how+': '+f.name);
+  }
+  $('#btn-repair').addEventListener('click', async ()=>{
+    if(editIdx===null) return;
+    const row = historyRows[editIdx];
+    const st = $('#edit-status'); st.className='setup-status'; st.textContent='Searching OneDrive for this receipt…';
+    try{
+      const files = await buildFileIndex(true);
+      const m = matchFile(files, row);
+      if(m && !m.ambiguous){
+        await relinkRow(row, m.f, m.how);
+        st.className='setup-status ok'; st.textContent='Relinked to '+m.f.folder+'/'+m.f.name+'.';
+        loadPdfPreview(row); renderHistory();
+        return;
+      }
+      // manual pick: month folder first, then everything
+      const iso = rowDateISO(row.date)||''; const ym = iso.slice(0,7);
+      const ordered = files.slice().sort((a,b)=>(b.folder===ym)-(a.folder===ym) || b.name.localeCompare(a.name));
+      const pick = $('#e-pick');
+      pick.innerHTML = '<div class="help" style="margin-bottom:8px">'+(m?'Several files could match. ':'No automatic match. ')+'Pick the right PDF:</div>'
+        + ordered.slice(0,60).map(f=>'<button type="button" class="pick-row" data-id="'+esc(f.id)+'"><span class="mono-badge">'+esc(f.folder)+'</span> '+esc(f.name)+'</button>').join('');
+      pick.style.display='block';
+      pick.querySelectorAll('.pick-row').forEach(b=>b.addEventListener('click', async ()=>{
+        const f = files.find(x=>x.id===b.dataset.id); if(!f) return;
+        st.textContent='Linking…';
+        try{ await relinkRow(row, f, 'manual'); st.className='setup-status ok'; st.textContent='Relinked to '+f.folder+'/'+f.name+'.'; pick.style.display='none'; loadPdfPreview(row); renderHistory(); }
+        catch(e){ st.className='setup-status bad'; st.textContent=e.message; }
+      }));
+      st.textContent='';
+    }catch(e){ st.className='setup-status bad'; st.textContent=e.message; }
+  });
+
+  /* ---- edit log (second worksheet) ---- */
+  const LOG_SHEET = 'Edit Log', LOG_TABLE = 'EditLog';
+  const LOG_COLS = ['When','Device','Action','Date','Merchant','Amount (RM)','Details'];
+  let logReady = false;
+  async function ensureLog(){
+    if(logReady) return true;
+    const wb = '/me/drive/root:'+encPath(basePath()+'/'+WB_NAME);
+    const J = {'Content-Type':'application/json'};
+    let t = await graph(wb+":/workbook/tables('"+LOG_TABLE+"')?$select=name");
+    if(t.ok){ logReady = true; return true; }
+    const wsPath = wb+":/workbook/worksheets('"+encodeURIComponent(LOG_SHEET)+"')";
+    let ws = await graph(wsPath+'?$select=name');
+    if(!ws.ok){
+      const add = await graph(wb+':/workbook/worksheets/add', {method:'POST', headers:J, body:JSON.stringify({name:LOG_SHEET})});
+      if(!add.ok) return false;
+    }
+    const hdr = await graph(wsPath+"/range(address='A1:G1')", {method:'PATCH', headers:J, body:JSON.stringify({values:[LOG_COLS]})});
+    if(!hdr.ok) return false;
+    const tb = await graph(wb+':/workbook/tables/add', {method:'POST', headers:J, body:JSON.stringify({address:"'"+LOG_SHEET+"'!A1:G1", hasHeaders:true})});
+    if(!tb.ok) return false;
+    const made = await tb.json();
+    if(made.name!==LOG_TABLE) await graph(wb+":/workbook/tables('"+made.name+"')", {method:'PATCH', headers:J, body:JSON.stringify({name:LOG_TABLE})});
+    logReady = true; return true;
+  }
+  async function logEdit(action, rec, details){
+    try{
+      if(!isOnline() || !account) return;
+      if(!(await ensureLog())) return;
+      await graph('/me/drive/root:'+encPath(basePath()+'/'+WB_NAME)+":/workbook/tables('"+LOG_TABLE+"')/rows/add", {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({values:[[nowStamp(), deviceName(), action, rowDateISO(rec.date)||rec.date||'', rec.merchant||'', rec.amount||'', details||'']]})
+      });
+    }catch(e){}
+  }
+
+  /* ---- delete a filed receipt ---- */
+  async function deleteRow(index){
+    const base = '/me/drive/root:'+encPath(basePath()+'/'+WB_NAME)+":/workbook/tables('"+TABLE+"')/rows/itemAt(index="+index+")";
+    let res = await graph(base, {method:'DELETE'});
+    if(!res.ok) res = await graph(base+'/range/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({shift:'Up'})});
+    if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error('Could not delete the row: '+((e.error&&e.error.message)||res.status)); }
+  }
+  let deleteArmed = false;
+  $('#btn-edit-delete').addEventListener('click', async ()=>{
+    if(editIdx===null) return;
+    const row = historyRows[editIdx];
+    const st = $('#edit-status');
+    if(!deleteArmed){
+      deleteArmed = true;
+      $('#btn-edit-delete').textContent = 'Tap again to confirm delete';
+      $('#e-delpdf-wrap').style.display = (row.pdf||row.pdfid) ? 'flex' : 'none';
+      st.className='setup-status bad'; st.textContent='This removes the row from '+WB_NAME+(($('#e-delpdf').checked&&(row.pdf||row.pdfid))?' and moves the PDF to the OneDrive recycle bin.':'.');
+      return;
+    }
+    if(!isOnline()){ toast('Deleting needs a connection'); return; }
+    $('#btn-edit-delete').disabled = true; st.className='setup-status'; st.textContent='Deleting…';
+    try{
+      if($('#e-delpdf').checked && (row.pdf||row.pdfid)){
+        let id = row.pdfid;
+        if(!id){ const m = matchFile(await buildFileIndex(false), row); if(m && m.how!=='match') id = m.f.id; }
+        if(id) await graph('/me/drive/items/'+id, {method:'DELETE'});
+        fileIndex = null;
+      }
+      await deleteRow(row.idx);
+      logEdit('Delete', row, $('#e-delpdf').checked ? 'row and PDF' : 'row only');
+      historyRows.splice(editIdx, 1);
+      S.set('historyCache', historyRows);
+      closeEditSheet(); renderHistory(); renderMonthChart();
+      toast('Receipt deleted');
+      loadHistory(true);
+    }catch(e){ st.className='setup-status bad'; st.textContent=e.message; $('#btn-edit-delete').disabled=false; }
+  });
+
   /* ---- OneDrive file helpers for edits and backfill ---- */
-  async function listMonthFolders(){
-    const res = await graph('/me/drive/root:'+encPath(basePath())+':/children?$select=name,folder&$top=200');
-    if(!res.ok) return [];
-    return (((await res.json()).value)||[]).filter(c=>c.folder && /^\d{4}-\d{2}$/.test(c.name)).map(c=>c.name).sort().reverse();
-  }
-  async function buildPdfIndex(){
-    // url -> drive item, across all month folders
-    const map = {};
-    for(const f of await listMonthFolders()){
-      const r = await graph('/me/drive/root:'+encPath(basePath()+'/'+f)+':/children?$select=id,name,webUrl&$top=500');
-      if(!r.ok) continue;
-      (((await r.json()).value)||[]).forEach(it=>{ if(it.webUrl) map[it.webUrl] = it; });
-    }
-    return map;
-  }
-  async function findItemByUrl(url, dateISO){
-    const ym = (rowDateISO(dateISO)||'').slice(0,7);
-    const folders = await listMonthFolders();
-    if(ym && !folders.includes(ym)) folders.unshift(ym);
-    else if(ym){ folders.splice(folders.indexOf(ym),1); folders.unshift(ym); }
-    for(const f of folders){
-      const r = await graph('/me/drive/root:'+encPath(basePath()+'/'+f)+':/children?$select=id,name,webUrl&$top=500');
-      if(!r.ok) continue;
-      const hit = (((await r.json()).value)||[]).find(it=>it.webUrl===url);
-      if(hit) return hit;
-    }
-    return null;
-  }
   async function ensureFolder(path){
     const r = await graph('/me/drive/root:'+encPath(path));
     if(r.ok) return;
@@ -3031,8 +3699,16 @@
     if(!c.ok && c.status!==409) throw new Error('Could not create folder '+path);
   }
   async function movePdf(rec, newRec){
-    const item = await findItemByUrl(rec.pdf, rec.date);
-    if(!item) throw new Error('PDF not found in OneDrive by its link');
+    // locate by id first, then by link / filename
+    let item = null;
+    if(rec.pdfid){ const r = await graph('/me/drive/items/'+rec.pdfid+'?select=id,name,webUrl,parentReference'); if(r.ok) item = await r.json(); }
+    if(!item){
+      const m = matchFile(await buildFileIndex(true), rec);
+      if(m && m.how!=='match') item = {id:m.f.id, name:m.f.name, webUrl:m.f.webUrl, parentReference:{path:'/drive/root:'+basePath()+'/'+m.f.folder}};
+    }
+    if(!item) throw new Error('PDF not found in OneDrive');
+    const oldName = item.name;
+    const oldFolder = (item.parentReference && item.parentReference.path) ? decodeURIComponent(item.parentReference.path.replace(/^\/drive\/root:/,'')) : null;
     const m = /_([a-z0-9]{6})\.pdf$/i.exec(item.name);
     const uid = m ? m[1] : Math.random().toString(36).slice(2,8);
     const newName = newRec.date+'_'+sanitizeName(newRec.merchant)+'_RM'+Number(newRec.amount).toFixed(2)+'_'+uid+'.pdf';
@@ -3042,14 +3718,70 @@
       method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({name:newName, parentReference:{path:'/drive/root:'+folder}})
     });
-    if(!res.ok){
-      const e = await res.json().catch(()=>({}));
-      throw new Error((e.error&&e.error.message)||('status '+res.status));
-    }
+    if(!res.ok){ const e = await res.json().catch(()=>({})); throw new Error((e.error&&e.error.message)||('status '+res.status)); }
     const moved = await res.json();
-    pdfIndex = null;
-    return moved.webUrl || rec.pdf;
+    // Verify: the moved item must now live in the target folder under the new name
+    const chk = await graph('/me/drive/items/'+item.id+'?select=id,name,webUrl,parentReference');
+    if(chk.ok){
+      const now = await chk.json();
+      const nowFolder = (now.parentReference && now.parentReference.path) ? decodeURIComponent(now.parentReference.path.replace(/^\/drive\/root:/,'')) : '';
+      if(now.name!==newName || (nowFolder && nowFolder!==folder)) throw new Error('OneDrive reported success but the file did not move');
+      moved.webUrl = now.webUrl || moved.webUrl;
+    }
+    // If a stray copy remains at the old location, remove it (recycle bin)
+    if(oldFolder && oldFolder!==folder){
+      const l = await graph('/me/drive/root:'+encPath(oldFolder)+':/children?$select=id,name');
+      if(l.ok){
+        const ghost = (((await l.json()).value)||[]).find(x=>x.name===oldName && x.id!==item.id);
+        if(ghost) await graph('/me/drive/items/'+ghost.id, {method:'DELETE'});
+      }
+    }
+    fileIndex = null;
+    return {url: moved.webUrl || rec.pdf, id: item.id};
   }
+
+  /* ---- integrity check ---- */
+  $('#btn-integrity').addEventListener('click', async ()=>{
+    const st = $('#integrity-status');
+    if(!account || !isOnline()){ st.className='setup-status bad'; st.textContent='Sign in and be online to run this.'; return; }
+    st.className='setup-status'; st.textContent='Checking workbook…';
+    try{
+      await ensureWorkbook();
+      await loadHistory(true);
+      st.textContent='Indexing PDFs…';
+      const files = await buildFileIndex(true);
+      const used = new Set();
+      let ok=0, linked=0, missing=0; const missingNames=[];
+      for(let i=0;i<historyRows.length;i++){
+        const r = historyRows[i];
+        if(r.idx===null||r.idx===undefined) continue;
+        st.textContent='Checking row '+(i+1)+' of '+historyRows.length+'…';
+        const m = matchFile(files, r);
+        if(!m || m.ambiguous){ missing++; missingNames.push(r.merchant+' ('+rowDateISO(r.date)+')'); continue; }
+        used.add(m.f.id);
+        if(m.how==='id' && r.pdf===m.f.webUrl){ ok++; continue; }
+        try{ await relinkRow(r, m.f, m.how); linked++; }catch(e){ missing++; missingNames.push(r.merchant+' (could not relink)'); }
+      }
+      const orphans = files.filter(f=>!used.has(f.id));
+      const invSeen = {}, dupInv = new Set();
+      const keySeen = {}, dupKey = new Set();
+      historyRows.forEach(r=>{
+        if(r.invoice){ const k=String(r.invoice).trim().toLowerCase(); if(invSeen[k]) dupInv.add(r.invoice); invSeen[k]=true; }
+        const k2=(rowDateISO(r.date)||'')+'|'+(r.merchant||'').toLowerCase()+'|'+(parseFloat(r.amount)||0).toFixed(2);
+        if(keySeen[k2]) dupKey.add((r.merchant||'')+' '+rowDateISO(r.date)+' RM'+fmt(parseFloat(r.amount)||0)); keySeen[k2]=true;
+      });
+      renderHistory();
+      const lines = [];
+      lines.push(ok+' row'+(ok===1?'':'s')+' verified'+(linked?', '+linked+' repaired':'')+'.');
+      if(missing) lines.push(missing+' row'+(missing===1?'':'s')+' without a PDF: '+missingNames.slice(0,4).join('; ')+(missingNames.length>4?'…':'')+'. Open the row and use Repair.');
+      if(orphans.length) lines.push(orphans.length+' PDF'+(orphans.length===1?'':'s')+' in OneDrive not referenced by any row: '+orphans.slice(0,3).map(f=>f.name).join('; ')+(orphans.length>3?'…':''));
+      if(dupInv.size) lines.push('Duplicate invoice numbers: '+Array.from(dupInv).slice(0,5).join(', ')+'.');
+      if(dupKey.size) lines.push('Possible duplicate receipts (same date, merchant, amount): '+Array.from(dupKey).slice(0,3).join('; ')+'.');
+      st.className = (missing||dupInv.size||dupKey.size) ? 'setup-status bad' : 'setup-status ok';
+      st.textContent = lines.join(' ');
+      if(linked) logEdit('Integrity check', {date:'',merchant:'',amount:''}, linked+' links repaired');
+    }catch(e){ st.className='setup-status bad'; st.textContent=e.message; }
+  });
 
   /* ---- backfill invoice numbers from stored PDFs ---- */
   function bufToB64(buf){
@@ -3087,15 +3819,16 @@
       st.textContent = 'Checking workbook…';
       await ensureWorkbook();
       await loadHistory(true);
-      const targets = historyRows.filter(r=>r.idx!==null && r.idx!==undefined && !r.invoice && r.pdf);
+      const targets = historyRows.filter(r=>r.idx!==null && r.idx!==undefined && !r.invoice && (r.pdf||r.pdfid));
       if(!targets.length){ st.className='setup-status ok'; st.textContent='Every filed receipt already has an invoice number.'; backfilling=false; return; }
       st.textContent = 'Locating '+targets.length+' PDF'+(targets.length>1?'s':'')+' in OneDrive…';
-      const index = await buildPdfIndex();
+      const files = await buildFileIndex(true);
       let done = 0, filled = 0, missing = 0, blank = 0;
       for(const r of targets){
         done++;
         st.textContent = 'Reading receipt '+done+' of '+targets.length+'… ('+filled+' filled)';
-        const item = index[r.pdf];
+        const mm = matchFile(files, r);
+        const item = (mm && !mm.ambiguous) ? mm.f : null;
         if(!item){ missing++; continue; }
         try{
           const dl = await graph('/me/drive/items/'+item.id+'/content');
