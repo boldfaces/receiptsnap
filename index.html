@@ -115,6 +115,11 @@
   .b-val{color:var(--success);border-color:var(--success-bd);background:var(--success-bg)}
   .b-late{color:var(--danger);border-color:var(--danger-bd);background:var(--danger-bg)}
   .lbl-opt{font-weight:400;color:var(--muted);font-size:11.5px;margin-left:4px}
+  .fgroup{padding-top:16px;margin-top:16px;border-top:1px solid var(--border)}
+  .fgroup.nosep{border-top:none;padding-top:0;margin-top:0}
+  .fgroup .sheet-actions{margin-top:14px}
+  .einv-actions{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .lnk{color:var(--link)!important;font-weight:600;font-size:13px;padding:0;text-align:left;text-decoration:none}
   .hfilter{margin:12px 0 4px}
   .hfilter .chips .chip{font-size:12px;padding:6px 11px}
   .check{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--muted);line-height:1.4;margin:2px 0 4px}
@@ -187,7 +192,11 @@
   .month-head{display:flex;align-items:baseline;justify-content:space-between;margin:22px 4px 10px}
   .month-head .total{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--muted)}
   .hist-group{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden}
-  .hist-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid var(--border)}
+  .hist-row{display:block;padding:12px 14px 11px;border-bottom:1px solid var(--border)}
+  .hr-top{display:flex;align-items:flex-start;gap:10px}
+  .hr-right{display:flex;flex-direction:column;align-items:flex-end;flex:none;min-width:70px}
+  .hr-inv{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);margin-bottom:2px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hr-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
   .hist-row:last-child{border-bottom:none}
   .hist-row.editable{cursor:pointer}
   .hist-row.editable:active{background:#fafafa}
@@ -195,6 +204,7 @@
   .hist-row .merchant{font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hist-row .meta{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .hist-row .amount{font-family:var(--mono);font-size:13.5px;font-weight:600;flex:none}
+  .hr-top .pdf-link{align-self:center}
   .pdf-link{flex:none;color:var(--muted-2);display:inline-flex;padding:6px;border-radius:6px}
   .pdf-link:hover{color:var(--link);background:#f4f4f5}
   .sync-note{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:12px 4px 0}
@@ -558,6 +568,14 @@
       </div>
 
       <div class="set-section">
+        <h3>My e-invoice details</h3>
+        <div class="set-card">
+          <div id="s-profile"></div>
+          <div class="help">Stays on this device. One tap copies these to paste into a merchant's e-invoice form.</div>
+        </div>
+      </div>
+
+      <div class="set-section">
         <h3>Entities</h3>
         <div class="set-card">
           <div class="field">
@@ -597,7 +615,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.4</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.5</span></div>
         </div>
       </div>
     </section>
@@ -757,6 +775,10 @@
       <div class="field"><label for="f-einvdl">Request deadline <span class="lbl-opt" id="f-einvdl-note"></span></label><input class="input" id="f-einvdl" type="date"></div>
       <div class="field"><label for="f-einvlink">Portal link</label><input class="input mono" id="f-einvlink" type="url" placeholder="https://…"></div>
     </div>
+    <div class="einv-actions">
+      <button type="button" class="btn-ghost lnk" id="f-qr-open" style="display:none"></button>
+      <button type="button" class="btn-ghost lnk" id="f-copyprofile">Copy my e-invoice details</button>
+    </div>
   </div>
   <div class="sheet-actions">
     <button class="btn-danger-ghost" id="btn-remove">Remove</button>
@@ -804,6 +826,7 @@
   </div>
   <button class="btn-ghost" id="btn-repair" style="display:none;color:var(--link);font-weight:600;font-size:13px;padding:0;margin:-8px 0 14px">Repair PDF link</button>
   <div id="e-pick" style="display:none;margin:-4px 0 14px"></div>
+  <div class="fgroup nosep">
   <div class="field">
     <label for="e-merchant">Merchant</label>
     <input class="input" id="e-merchant" type="text">
@@ -822,6 +845,8 @@
       <input class="input mono" id="e-amount" type="number" step="0.01" inputmode="decimal">
     </div>
   </div>
+  </div>
+  <div class="fgroup">
   <div class="field">
     <label>Entity</label>
     <div class="chips" id="e-entity"></div>
@@ -838,6 +863,9 @@
     <label for="e-notes">Notes <span class="lbl-opt">business purpose, who attended</span></label>
     <input class="input" id="e-notes" type="text">
   </div>
+  <div class="field"><label>Tax treatment <span class="lbl-opt">auto from purpose, hint only</span></label><div class="help" id="e-tax" style="margin-top:0"></div></div>
+  </div>
+  <div class="fgroup">
   <div class="field">
     <label>E-Invoice</label>
     <div class="chips" id="e-einv"></div>
@@ -846,17 +874,24 @@
       <div class="field"><label for="e-einvref">Validation ref</label><input class="input mono" id="e-einvref" type="text" placeholder="MyInvois UUID"></div>
     </div>
     <div class="field"><label for="e-einvlink">Portal link</label><input class="input mono" id="e-einvlink" type="url" placeholder="https://…"></div>
-    <a class="btn-ghost" id="e-einv-open" href="#" target="_blank" rel="noopener" style="display:none;color:var(--link);font-weight:600;font-size:13px;padding:0">Open merchant e-invoice portal</a>
+    <div class="einv-actions">
+      <a class="btn-ghost lnk" id="e-einv-open" href="#" target="_blank" rel="noopener" style="display:none">Open merchant portal <span class="lbl-opt" id="e-einv-domain"></span></a>
+      <button type="button" class="btn-ghost lnk" id="e-copyprofile">Copy my e-invoice details</button>
+    </div>
   </div>
-  <div class="field"><label>Tax treatment <span class="lbl-opt">auto from purpose, hint only</span></label><div class="help" id="e-tax" style="margin-top:0"></div></div>
+  </div>
+  <div class="fgroup">
   <label class="check" id="e-movepdf-wrap"><input type="checkbox" id="e-movepdf" checked><span>Also move and rename the PDF in OneDrive to match the corrected date, merchant and amount</span></label>
   <div class="sheet-actions">
     <button class="btn btn-outline" id="btn-edit-cancel">Cancel</button>
     <button class="btn btn-primary" id="btn-edit-save">Save changes</button>
   </div>
   <div class="setup-status" id="edit-status"></div>
-  <label class="check" id="e-delpdf-wrap" style="display:none;margin-top:14px"><input type="checkbox" id="e-delpdf" checked><span>Also delete the PDF file (goes to the OneDrive recycle bin)</span></label>
-  <button class="btn-danger-ghost" id="btn-edit-delete" style="width:100%;margin-top:14px">Delete this receipt</button>
+  </div>
+  <div class="fgroup">
+  <label class="check" id="e-delpdf-wrap" style="display:none;margin-bottom:12px"><input type="checkbox" id="e-delpdf" checked><span>Also delete the PDF file (goes to the OneDrive recycle bin)</span></label>
+  <button class="btn-danger-ghost" id="btn-edit-delete" style="width:100%">Delete this receipt</button>
+  </div>
 </div>
 
 <!-- claims breakdown sheet -->
@@ -962,6 +997,55 @@
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   }
   function daysUntil(iso){ const d = rowDateISO(iso); if(!d) return null; const t = new Date(); t.setHours(0,0,0,0); return Math.round((new Date(d+'T00:00:00') - t)/86400000); }
+  function hostOf(u){ try{ return new URL(u).hostname; }catch(e){ return ''; } }
+  const JSQR_URL = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+  let jsqrLoad = null;
+  function loadJsQr(){
+    if(window.jsQR) return Promise.resolve();
+    if(jsqrLoad) return jsqrLoad;
+    jsqrLoad = new Promise((res, rej)=>{
+      const s = document.createElement('script'); s.src = JSQR_URL;
+      s.onload = ()=> window.jsQR ? res() : rej(new Error('QR library did not initialise'));
+      s.onerror = ()=>{ jsqrLoad = null; rej(new Error('QR library failed to load')); };
+      document.head.appendChild(s);
+    });
+    return jsqrLoad;
+  }
+  async function decodeQr(dataUrl){
+    // QR contents are untrusted text: decoded, validated, never executed or auto-opened.
+    try{ await loadJsQr(); }catch(e){ return null; }
+    const img = await new Promise((res, rej)=>{ const i = new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('img')); i.src = dataUrl; }).catch(()=>null);
+    if(!img) return null;
+    for(const maxW of [1000, 1800]){
+      const sc = Math.min(1, maxW/img.width);
+      const c = document.createElement('canvas');
+      c.width = Math.max(2, Math.round(img.width*sc)); c.height = Math.max(2, Math.round(img.height*sc));
+      const ctx = c.getContext('2d', {willReadFrequently:true});
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      const id = ctx.getImageData(0, 0, c.width, c.height);
+      try{
+        const r = window.jsQR(id.data, id.width, id.height, {inversionAttempts:'dontInvert'});
+        if(r && r.data && r.data.trim()) return r.data.trim();
+      }catch(e){}
+    }
+    return null;
+  }
+  function applyQr(r, text){
+    if(!text) return false;
+    r.qr = text;
+    if(!r.einvLink && /^https?:\/\//i.test(text)) r.einvLink = text;
+    return true;
+  }
+  function einvProfile(){ const p = S.get('einvProfile', null); return (p && typeof p==='object') ? p : {}; }
+  const PROFILE_FIELDS = [['name','Registered name'],['tin','TIN'],['brn','Business registration no. (SSM)'],['sst','SST no.'],['email','Email'],['phone','Phone'],['address','Address']];
+  function profileText(){ const p = einvProfile(); return PROFILE_FIELDS.filter(f=>p[f[0]]).map(f=>f[1]+': '+p[f[0]]).join('\n'); }
+  async function copyProfile(){
+    const t = profileText();
+    if(!t){ toast('Fill in your e-invoice details in Settings first'); return; }
+    try{ await navigator.clipboard.writeText(t); toast('Your e-invoice details are copied'); }
+    catch(e){ toast('Could not copy on this device'); }
+  }
+
   function einvBadge(rec){
     const s = rec.einvstatus || '';
     if(!s) return '';
@@ -1094,6 +1178,9 @@
     $('#s-device').value = deviceName();
     $('#s-enhance').checked = S.get('enhance', true);
     $('#s-entities').value = entities().join(', ');
+    const pf = einvProfile();
+    $('#s-profile').innerHTML = PROFILE_FIELDS.map(f=>'<div class="field"><label for="p-'+f[0]+'">'+f[1]+'</label><input class="input'+(f[0]==='tin'||f[0]==='brn'||f[0]==='sst'?' mono':'')+'" id="p-'+f[0]+'" type="text" autocomplete="off" value="'+esc(pf[f[0]]||'')+'"></div>').join('');
+    PROFILE_FIELDS.forEach(f=>$('#p-'+f[0]).addEventListener('change', e=>{ const p = einvProfile(); p[f[0]] = e.target.value.trim(); S.set('einvProfile', p); }));
     const tm = taxMap(); $('#s-taxmap').value = Object.keys(tm).map(k=>k+' = '+tm[k]).join('\n');
     const raw = S.get('labels', DEFAULT_LABELS);
     $('#s-labels').value = (Array.isArray(raw)?raw:DEFAULT_LABELS).join(', ');
@@ -1440,6 +1527,7 @@
       r.thumbUrl = small.dataUrl;
       saveItem(r);
       renderTray();
+      decodeQr(big.dataUrl).then(t=>{ if(applyQr(r, t)){ saveItem(r); if(activeId===r.id) syncQrLine(r); } });
       await runExtraction(r);
     }catch(e){ failItem(r, e); }
     saveItem(r);
@@ -1468,7 +1556,8 @@
       const out = await extract(r);
       r.merchant = (out.merchant||'').trim() || 'Unknown merchant';
       r.invoice = (out.invoice===null||out.invoice===undefined) ? '' : String(out.invoice).trim();
-      r.einvLink = (out.einvoice_link && /^https?:\/\//i.test(String(out.einvoice_link))) ? String(out.einvoice_link).trim() : '';
+      const printedLink = (out.einvoice_link && /^https?:\/\//i.test(String(out.einvoice_link))) ? String(out.einvoice_link).trim() : '';
+      if(printedLink && !r.einvLink) r.einvLink = printedLink;
       const dlRaw = /^\d{4}-\d{2}-\d{2}$/.test(out.einvoice_deadline||'') ? out.einvoice_deadline : '';
       r.einvDeadline = dlRaw;
       r.einvDlDefault = !dlRaw;
@@ -2528,6 +2617,7 @@
       const big = await downscale(dataUrl, 3000, 0.85);
       r.pages.push(big.dataUrl);
       saveItem(r);
+      if(!r.qr) decodeQr(big.dataUrl).then(t=>{ if(applyQr(r, t)) saveItem(r); });
       reExtract(r);
       toast('Page '+r.pages.length+' added to '+(r.merchant||'last receipt'));
     }else{
@@ -2658,6 +2748,7 @@
     $('#f-einvdl').value = r.einvDeadline || '';
     $('#f-einvdl-note').textContent = r.einvDlDefault ? '(assumed: month end)' : '(from receipt)';
     $('#f-einvlink').value = r.einvLink || '';
+    syncQrLine(r);
     $('#scrim').classList.add('show');
     $('#sheet').classList.add('show');
   }
@@ -2666,6 +2757,16 @@
     $('#sheet').classList.remove('show');
     activeId = null;
   }
+  function syncQrLine(r){
+    const b = $('#f-qr-open');
+    const link = (r.einvLink && /^https?:\/\//i.test(r.einvLink)) ? r.einvLink : '';
+    if(link){ b.style.display='inline-flex'; b.textContent = 'Open merchant portal ('+hostOf(link)+')'+(r.qr===link?' · from QR':''); b.onclick = ()=>window.open(link, '_blank', 'noopener'); }
+    else if(r.qr){ b.style.display='inline-flex'; b.textContent = 'QR read: '+(r.qr.length>40?r.qr.slice(0,40)+'…':r.qr)+' (not a link)'; b.onclick = null; }
+    else b.style.display='none';
+    if($('#f-einvlink').value !== (r.einvLink||'')) $('#f-einvlink').value = r.einvLink||'';
+  }
+  $('#f-copyprofile').addEventListener('click', copyProfile);
+  $('#e-copyprofile').addEventListener('click', copyProfile);
   $('#scrim').addEventListener('click', ()=>{ closeSheet(); closePurge(); closeEditSheet(); closeStats(); });
   $('#btn-photo-toggle').addEventListener('click', ()=>{
     const p = $('#full-photos');
@@ -3005,13 +3106,17 @@
         +'<div class="hist-group">'+rows.map(({row:r,i})=>{
           const link = r.pdf ? '<a class="pdf-link" href="'+esc(r.pdf)+'" target="_blank" rel="noopener" title="Open PDF in OneDrive"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>' : '';
           const editable = r.idx!==undefined && r.idx!==null;
-          const inv = r.invoice ? '<span class="purpose-badge mono-badge">#'+esc(r.invoice)+'</span>' : '';
-          const ent = (r.entity && hfilter.entity==='All') ? '<span class="purpose-badge">'+esc(r.entity)+'</span>' : '';
+          const inv = r.invoice ? '<div class="hr-inv">#'+esc(r.invoice)+'</div>' : '';
+          const chips = (r.entity ? '<span class="purpose-badge">'+esc(r.entity)+'</span>' : '')
+            + (r.purpose ? '<span class="purpose-badge">'+esc(r.purpose)+'</span>' : '')
+            + einvBadge(r);
           return '<div class="hist-row'+(editable?' editable':'')+'" data-i="'+i+'">'
-            +'<div class="info"><div class="merchant">'+esc(r.merchant)+'</div>'
-            +'<div class="meta"><span>'+shortDate(r.date)+'</span><span class="purpose-badge">'+esc(r.purpose)+'</span>'+ent+inv+einvBadge(r)+'</div></div>'
-            +'<div class="amount">RM '+fmt(parseFloat(r.amount)||0)+'</div>'
-            + link
+            +'<div class="hr-top">'
+              +'<div class="info"><div class="merchant">'+esc(r.merchant)+'</div><div class="meta"><span>'+shortDate(r.date)+'</span></div></div>'
+              +'<div class="hr-right">'+inv+'<div class="amount">RM '+fmt(parseFloat(r.amount)||0)+'</div></div>'
+              + link
+            +'</div>'
+            +(chips ? '<div class="hr-chips">'+chips+'</div>' : '')
           +'</div>';
         }).join('')+'</div>';
     }).join('');
@@ -3418,7 +3523,7 @@
     $('#e-einvdl').value = rowDateISO(row.einvdeadline) || '';
     $('#e-einvref').value = row.einvref || '';
     $('#e-einvlink').value = row.einvlink || '';
-    const lk = $('#e-einv-open'); if(row.einvlink){ lk.href = row.einvlink; lk.style.display='inline'; } else lk.style.display='none';
+    const lk = $('#e-einv-open'); if(row.einvlink && /^https?:\/\//i.test(row.einvlink)){ lk.href = row.einvlink; lk.style.display='inline-flex'; $('#e-einv-domain').textContent = '('+hostOf(row.einvlink)+')'; } else lk.style.display='none';
     $('#e-tax').textContent = row.tax || taxFor(purpose);
     $('#edit-status').textContent = '';
     $('#edit-status').className = 'setup-status';
