@@ -530,6 +530,7 @@
               <span></span>
             </div>
             <div class="setup-status" id="integrity-status"></div>
+            <button class="btn-ghost" id="btn-dedupe" style="display:none;color:var(--danger);font-weight:600;font-size:13px;padding:6px 0 0">Remove duplicate rows</button>
           </div>
         </div>
       </div>
@@ -615,7 +616,7 @@
 
       <div class="set-section" style="margin-bottom:8px">
         <div class="set-card" style="padding:6px 16px">
-          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.5</span></div>
+          <div class="kv" style="border-top:none"><span class="k">Version</span><span class="v">2.5.1</span></div>
         </div>
       </div>
     </section>
@@ -2814,6 +2815,7 @@
     r.other = $('#f-other').value.trim();
     r.status = 'ready';
     r.flag = false;
+    if(r.uploadedItem && (r.merchant!==(r._filedMerchant||r.merchant) )) r.uploadedItem = null;
     saveItem(r);
     closeSheet();
     renderTray();
@@ -2884,18 +2886,40 @@
     }
   }
 
+  async function rowExistsFor(r){
+    // A previous attempt may have written the row and then failed afterwards.
+    try{
+      const res = await graph('/me/drive/root:'+encPath(basePath()+'/'+WB_NAME)+":/workbook/tables('"+TABLE+"')/rows?$top=2000");
+      if(!res.ok) return false;
+      const data = await res.json();
+      const uid = (r.uid||'').toLowerCase();
+      const pi = colIndex('pdf'), ai = colIndex('amount'), di = colIndex('date'), mi = colIndex('merchant');
+      return (data.value||[]).some(row=>{
+        const v = row.values && row.values[0]; if(!Array.isArray(v)) return false;
+        if(uid && pi>=0 && String(v[pi]||'').toLowerCase().includes('_'+uid+'.pdf')) return true;
+        return di>=0 && mi>=0 && ai>=0 && (rowDateISO(v[di])===r.dateISO) && String(v[mi]||'')===r.merchant && Math.abs((parseFloat(v[ai])||0) - r.amount) < 0.005;
+      });
+    }catch(e){ return false; }
+  }
+
   async function fileReceipt(r, onStep){
     if(onStep) onStep(0);
+    if(!r.rowWritten && r.filingAttempted && await rowExistsFor(r)){ r.rowWritten = true; saveItem(r); }
+    r.filingAttempted = true; saveItem(r);
     const pdfBlob = await makePdf(r);
     if(onStep) onStep(1);
     if(!r.uid){ r.uid = Math.random().toString(36).slice(2,8); saveItem(r); }
     const fname = r.dateISO+'_'+sanitizeName(r.merchant)+'_RM'+r.amount.toFixed(2)+'_'+r.uid+'.pdf';
     const ym = r.dateISO.slice(0,7);
-    const uploaded = await uploadPdf(pdfBlob, basePath()+'/'+ym+'/'+fname);
+    let uploaded = r.uploadedItem || null;
+    if(!uploaded){ uploaded = await uploadPdf(pdfBlob, basePath()+'/'+ym+'/'+fname); r.uploadedItem = {id:uploaded&&uploaded.id, webUrl:uploaded&&uploaded.webUrl}; saveItem(r); }
     if(onStep) onStep(2);
     const purposeText = r.purpose==='Others' ? r.other : r.purpose;
-    await appendRow(recordToValues({date:r.dateISO, merchant:r.merchant, purpose:purposeText, amount:r.amount, pdf:(uploaded&&uploaded.webUrl)||'', scanned:nowStamp(), invoice:r.invoice||'', pdfid:(uploaded&&uploaded.id)||'', entity:r.entity||'', notes:r.notes||'', tax:taxFor(purposeText), einvstatus:r.einvStatus||'Not requested', einvref:r.einvRef||'', einvlink:r.einvLink||'', einvdeadline:r.einvDeadline||''}, null));
-    pdfIndex = null;
+    if(!r.rowWritten){
+      await appendRow(recordToValues({date:r.dateISO, merchant:r.merchant, purpose:purposeText, amount:r.amount, pdf:(uploaded&&uploaded.webUrl)||'', scanned:nowStamp(), invoice:r.invoice||'', pdfid:(uploaded&&uploaded.id)||'', entity:r.entity||'', notes:r.notes||'', tax:taxFor(purposeText), einvstatus:r.einvStatus||'Not requested', einvref:r.einvRef||'', einvlink:r.einvLink||'', einvdeadline:r.einvDeadline||''}, null));
+      r.rowWritten = true; saveItem(r);
+    }
+    fileIndex = null;
     return uploaded;
   }
 
@@ -3868,6 +3892,10 @@
         try{ await relinkRow(r, m.f, m.how); linked++; }catch(e){ missing++; missingNames.push(r.merchant+' (could not relink)'); }
       }
       const orphans = files.filter(f=>!used.has(f.id));
+      // exact duplicate rows (same PDF), e.g. from a failed-then-retried filing
+      const byPdf = {};
+      historyRows.forEach(r=>{ const k = (r.pdfid||'') || uidFromUrl(r.pdf||''); if(k){ (byPdf[k] = byPdf[k]||[]).push(r); } });
+      const exactDupes = Object.values(byPdf).filter(a=>a.length>1);
       const invSeen = {}, dupInv = new Set();
       const keySeen = {}, dupKey = new Set();
       historyRows.forEach(r=>{
@@ -3880,10 +3908,25 @@
       lines.push(ok+' row'+(ok===1?'':'s')+' verified'+(linked?', '+linked+' repaired':'')+'.');
       if(missing) lines.push(missing+' row'+(missing===1?'':'s')+' without a PDF: '+missingNames.slice(0,4).join('; ')+(missingNames.length>4?'…':'')+'. Open the row and use Repair.');
       if(orphans.length) lines.push(orphans.length+' PDF'+(orphans.length===1?'':'s')+' in OneDrive not referenced by any row: '+orphans.slice(0,3).map(f=>f.name).join('; ')+(orphans.length>3?'…':''));
+      if(exactDupes.length) lines.push(exactDupes.length+' receipt'+(exactDupes.length>1?'s':'')+' filed more than once (same PDF): '+exactDupes.slice(0,3).map(a=>a[0].merchant+' ×'+a.length).join('; ')+'. Tap "Remove duplicate rows" to keep one of each.');
       if(dupInv.size) lines.push('Duplicate invoice numbers: '+Array.from(dupInv).slice(0,5).join(', ')+'.');
       if(dupKey.size) lines.push('Possible duplicate receipts (same date, merchant, amount): '+Array.from(dupKey).slice(0,3).join('; ')+'.');
-      st.className = (missing||dupInv.size||dupKey.size) ? 'setup-status bad' : 'setup-status ok';
+      st.className = (missing||dupInv.size||dupKey.size||exactDupes.length) ? 'setup-status bad' : 'setup-status ok';
       st.textContent = lines.join(' ');
+      $('#btn-dedupe').style.display = exactDupes.length ? 'inline' : 'none';
+      $('#btn-dedupe').onclick = async ()=>{
+        $('#btn-dedupe').disabled = true; st.className='setup-status'; st.textContent='Removing duplicate rows…';
+        try{
+          // delete from the highest index down so earlier indices stay valid
+          const victims = [];
+          exactDupes.forEach(a=>{ a.slice().sort((x,y)=>x.idx-y.idx).slice(1).forEach(v=>victims.push(v)); });
+          victims.sort((x,y)=>y.idx-x.idx);
+          for(const v of victims){ await deleteRow(v.idx); logEdit('Remove duplicate row', v, 'same PDF as an earlier row'); }
+          await loadHistory(true); renderHistory(); renderMonthChart();
+          st.className='setup-status ok'; st.textContent='Removed '+victims.length+' duplicate row'+(victims.length>1?'s':'')+'. Run the check again to confirm.';
+        }catch(e){ st.className='setup-status bad'; st.textContent=e.message; }
+        $('#btn-dedupe').disabled = false; $('#btn-dedupe').style.display='none';
+      };
       if(linked) logEdit('Integrity check', {date:'',merchant:'',amount:''}, linked+' links repaired');
     }catch(e){ st.className='setup-status bad'; st.textContent=e.message; }
   });
